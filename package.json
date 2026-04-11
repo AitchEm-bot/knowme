@@ -1,0 +1,9 @@
+{
+  "name": "knowme",
+  "private": true,
+  "workspaces": ["extension"],
+  "scripts": {
+    "dev:ext": "npm run dev --workspace=extension",
+    "build:ext": "npm run build --workspace=extension"
+  }
+}

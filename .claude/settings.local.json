@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npm run:*)",
+      "Bash(git init:*)",
+      "Bash(unzip -o neural_networks_of_the_brain.zip -d brain_model_tmp)",
+      "WebSearch"
+    ]
+  }
+}

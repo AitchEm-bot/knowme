@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "KnowMe",
+  "version": "0.1.0",
+  "description": "Visualize predicted brain responses to your Instagram feed using Meta's TRIBE v2",
+  "permissions": ["sidePanel", "activeTab", "storage"],
+  "host_permissions": [
+    "https://www.instagram.com/*",
+    "http://localhost:8000/*"
+  ],
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.instagram.com/*"],
+      "js": ["content/index.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "KnowMe - Brain Activity Viewer"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/brain.glb"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

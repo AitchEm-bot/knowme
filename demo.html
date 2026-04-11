@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KnowMe — Brain Visualization Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a1a;
+      color: #e0e0e0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #brain-panel {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    #brain-container { flex: 1; position: relative; }
+    #brain-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+    }
+    #brain-header h1 { font-size: 22px; font-weight: 600; color: #fff; }
+    #brain-header .badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      background: rgba(255, 111, 0, 0.15);
+      color: #ff6f00;
+    }
+
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      background: #0a0a1a;
+      z-index: 10;
+      gap: 16px;
+    }
+    #loading-overlay .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #1a1a2e;
+      border-top-color: #ff6f00;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #side-panel {
+      width: 380px;
+      border-left: 1px solid #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    #side-panel h2 {
+      font-size: 15px;
+      font-weight: 600;
+      padding: 16px 20px 8px;
+      color: #fff;
+    }
+
+    #scenarios {
+      display: flex;
+      gap: 6px;
+      padding: 8px 20px 16px;
+      flex-wrap: wrap;
+    }
+    .scenario-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid #2a2a3e;
+      background: transparent;
+      color: #aaa;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .scenario-btn:hover { border-color: #ff6f00; color: #fff; }
+    .scenario-btn.active {
+      background: rgba(255, 111, 0, 0.15);
+      border-color: #ff6f00;
+      color: #ff6f00;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #666;
+      padding: 12px 20px 8px;
+    }
+    .engagement-bar {
+      display: flex;
+      align-items: center;
+      padding: 5px 20px;
+    }
+    .engagement-bar .label { font-size: 12px; width: 150px; color: #bbb; }
+    .engagement-bar .bar-track {
+      flex: 1; height: 6px; background: #1a1a2e;
+      border-radius: 3px; overflow: hidden;
+    }
+    .engagement-bar .bar-fill {
+      height: 100%; border-radius: 3px;
+      transition: width 1s ease; width: 0%;
+    }
+    .engagement-bar .value { font-size: 12px; width: 40px; text-align: right; color: #888; }
+
+    .summary {
+      padding: 16px 20px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #ccc;
+      border-top: 1px solid #1a1a2e;
+    }
+
+    .region-list { list-style: none; padding: 0 20px 20px; }
+    .region-item {
+      display: flex; align-items: center;
+      padding: 6px 0; border-bottom: 1px solid #111;
+    }
+    .region-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 10px; flex-shrink: 0;
+    }
+    .region-name { font-size: 12px; flex: 1; color: #ccc; }
+    .region-value { font-size: 12px; color: #888; }
+
+    #tooltip {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.9);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 1000;
+      display: none;
+    }
+
+    .footer {
+      padding: 12px 20px;
+      font-size: 10px;
+      color: #444;
+      border-top: 1px solid #1a1a2e;
+      text-align: center;
+      margin-top: auto;
+    }
+    .footer a { color: #1CAAD9; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div id="brain-panel">
+    <div id="brain-header">
+      <h1>KnowMe</h1>
+      <span class="badge">Demo Mode</span>
+    </div>
+    <div id="brain-container">
+      <div id="loading-overlay">
+        <div class="spinner"></div>
+        <span style="color: #666; font-size: 13px;">Loading brain model...</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="side-panel">
+    <h2>Simulated Post Analysis</h2>
+    <div id="scenarios"></div>
+    <div class="summary" id="summary"></div>
+    <div class="section-title">Cognitive Engagement</div>
+    <div id="engagement-bars"></div>
+    <div class="section-title" style="margin-top: 8px;">Top Brain Regions</div>
+    <ul class="region-list" id="region-list"></ul>
+    <div class="footer">
+      TRIBE v2 by Meta FAIR &middot; CC BY-NC 4.0<br>
+      Brain model: <a href="https://sketchfab.com/3d-models/neural-networks-of-the-brain-fa48173d4532407c9c2a4ba06a9bcd2d" target="_blank">Neural Networks of the Brain</a> by UDL (CC BY 4.0)<br>
+      Demo uses simulated data &mdash; not real brain predictions
+    </div>
+  </div>
+
+  <div id="tooltip"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // ===== BRAIN REGION DEFINITIONS =====
+    const REGIONS = {
+      visual_processing:    { label: 'Visual Processing',           color: '#4fc3f7' },
+      face_recognition:     { label: 'Face Recognition',            color: '#ba68c8' },
+      scene_processing:     { label: 'Scene & Place Processing',    color: '#81c784' },
+      social_cognition:     { label: 'Social & Emotional',          color: '#ff8a65' },
+      reward_motivation:    { label: 'Reward & Motivation',         color: '#ffd54f' },
+      language_semantic:    { label: 'Language & Semantics',        color: '#90caf9' },
+      attention:            { label: 'Attention',                   color: '#ef5350' },
+      memory:               { label: 'Memory Encoding',             color: '#a1887f' },
+      emotional_regulation: { label: 'Emotional Regulation',        color: '#f48fb1' },
+      body_motion:          { label: 'Body & Motion',               color: '#80cbc4' },
+    };
+
+    // ===== SIMULATED SCENARIOS =====
+    const SCENARIOS = {
+      'Selfie Post': {
+        summary: 'This content strongly engages face recognition (87%) and social cognition (72%). The fusiform face area and temporoparietal junction show high predicted activation, suggesting the brain prioritizes facial feature processing and social evaluation.',
+        scores: {
+          visual_processing: 0.65, face_recognition: 0.87, scene_processing: 0.15,
+          social_cognition: 0.72, reward_motivation: 0.58, language_semantic: 0.12,
+          attention: 0.45, memory: 0.30, emotional_regulation: 0.40, body_motion: 0.20,
+        },
+      },
+      'Landscape Photo': {
+        summary: 'This content primarily engages scene processing (82%) and visual processing (78%). The parahippocampal place area shows strong activation, indicating deep environmental and spatial analysis. Memory encoding is also elevated.',
+        scores: {
+          visual_processing: 0.78, face_recognition: 0.08, scene_processing: 0.82,
+          social_cognition: 0.15, reward_motivation: 0.35, language_semantic: 0.10,
+          attention: 0.60, memory: 0.55, emotional_regulation: 0.20, body_motion: 0.12,
+        },
+      },
+      'Reel / Dance Video': {
+        summary: 'This content engages body & motion processing (85%), reward pathways (76%), and attention networks (71%). The middle temporal area and orbitofrontal cortex show strong predicted activation — a typical pattern for engaging, fast-paced video content.',
+        scores: {
+          visual_processing: 0.70, face_recognition: 0.40, scene_processing: 0.20,
+          social_cognition: 0.45, reward_motivation: 0.76, language_semantic: 0.15,
+          attention: 0.71, memory: 0.25, emotional_regulation: 0.30, body_motion: 0.85,
+        },
+      },
+      'Emotional Caption': {
+        summary: 'This content strongly engages language processing (80%), emotional regulation (75%), and social cognition (70%). The anterior cingulate and Broca\'s area show high activation, reflecting deep semantic processing and emotional resonance with the text.',
+        scores: {
+          visual_processing: 0.30, face_recognition: 0.20, scene_processing: 0.10,
+          social_cognition: 0.70, reward_motivation: 0.50, language_semantic: 0.80,
+          attention: 0.55, memory: 0.60, emotional_regulation: 0.75, body_motion: 0.08,
+        },
+      },
+      'Food Photo': {
+        summary: 'This content engages reward & motivation pathways (83%) and visual processing (72%). The orbitofrontal cortex shows strong activation — the brain\'s reward evaluation center responds to appetizing visual stimuli.',
+        scores: {
+          visual_processing: 0.72, face_recognition: 0.05, scene_processing: 0.35,
+          social_cognition: 0.20, reward_motivation: 0.83, language_semantic: 0.15,
+          attention: 0.50, memory: 0.40, emotional_regulation: 0.25, body_motion: 0.10,
+        },
+      },
+    };
+
+    // ===== THREE.JS SETUP =====
+    const container = document.getElementById('brain-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a1a);
+
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 2000);
+    camera.position.set(0, 80, 250);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.6;
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0x404060, 0.8));
+    const dir1 = new THREE.DirectionalLight(0xffffff, 1.0);
+    dir1.position.set(150, 150, 150);
+    scene.add(dir1);
+    const dir2 = new THREE.DirectionalLight(0x6666cc, 0.4);
+    dir2.position.set(-150, -80, -150);
+    scene.add(dir2);
+    const rimLight = new THREE.DirectionalLight(0xff6f00, 0.2);
+    rimLight.position.set(0, -100, -200);
+    scene.add(rimLight);
+
+    // ===== STATE =====
+    let allMeshes = [];        // all meshes from the GLB
+    let vertexRegions = [];    // per-mesh arrays of region assignments
+    let vertexCounts = [];     // per-mesh vertex counts
+    let currentActs = [];      // per-mesh current activation arrays
+    let targetActs = [];       // per-mesh target activation arrays
+    let originalColors = [];   // per-mesh original vertex colors
+    let transitionProgress = 1.0;
+
+    const colorDark = new THREE.Color(0x0a0a14);
+    const tmpColor  = new THREE.Color();
+
+    // Pre-compute THREE.Color for each region
+    const regionColors = {};
+    for (const [key, info] of Object.entries(REGIONS)) {
+      regionColors[key] = new THREE.Color(info.color);
+    }
+
+    // ===== LOAD GLB MODEL =====
+    const loader = new GLTFLoader();
+    loader.load(
+      'extension/src/assets/brain-model/brain.glb',
+      (gltf) => {
+        const model = gltf.scene;
+
+        // Center and scale the model
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scale = 120 / maxDim;
+
+        model.position.sub(center).multiplyScalar(scale);
+        model.scale.setScalar(scale);
+
+        // Collect all meshes and set up vertex coloring
+        model.traverse((child) => {
+          if (!child.isMesh) return;
+
+          const geo = child.geometry;
+          const vCount = geo.attributes.position.count;
+
+          // Store original colors if they exist, or create base colors
+          const origColors = new Float32Array(vCount * 3);
+          if (geo.attributes.color) {
+            origColors.set(geo.attributes.color.array);
+          } else {
+            for (let i = 0; i < vCount * 3; i++) origColors[i] = 0.18;
+          }
+
+          // Create or overwrite color attribute
+          const colors = new Float32Array(vCount * 3);
+          colors.set(origColors);
+          geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+          // Replace material with vertex-colored material
+          child.material = new THREE.MeshPhongMaterial({
+            vertexColors: true,
+            shininess: 40,
+            specular: new THREE.Color(0x333333),
+            transparent: true,
+            opacity: 0.95,
+          });
+
+          // Assign brain regions based on vertex world positions
+          const posAttr = geo.attributes.position;
+          const regions = new Array(vCount);
+          const worldPos = new THREE.Vector3();
+
+          for (let i = 0; i < vCount; i++) {
+            worldPos.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+            worldPos.applyMatrix4(child.matrixWorld);
+            // Scale to model space
+            worldPos.multiplyScalar(scale);
+
+            regions[i] = assignRegion(worldPos.x, worldPos.y, worldPos.z, size, scale);
+          }
+
+          allMeshes.push(child);
+          vertexRegions.push(regions);
+          vertexCounts.push(vCount);
+          currentActs.push(new Float32Array(vCount).fill(0));
+          targetActs.push(new Float32Array(vCount).fill(0));
+          originalColors.push(origColors);
+        });
+
+        scene.add(model);
+
+        // Update camera target
+        controls.target.set(0, 0, 0);
+        camera.position.set(0, 40, 200);
+
+        // Hide loading
+        document.getElementById('loading-overlay').style.display = 'none';
+
+        console.log(`[KnowMe] Loaded brain model: ${allMeshes.length} meshes, ${vertexCounts.reduce((a,b) => a+b, 0)} total vertices`);
+      },
+      (progress) => {
+        const pct = progress.total ? Math.round(progress.loaded / progress.total * 100) : '...';
+        document.querySelector('#loading-overlay span').textContent = `Loading brain model... ${pct}%`;
+      },
+      (err) => {
+        console.error('[KnowMe] Failed to load brain model:', err);
+        document.querySelector('#loading-overlay span').textContent = 'Failed to load model. Check console.';
+      }
+    );
+
+    /**
+     * Assign a brain region to a vertex based on its 3D position.
+     * Uses approximate neuroanatomy: occipital = visual, temporal = language/memory,
+     * frontal = attention/reward, parietal = social/body.
+     */
+    function assignRegion(x, y, z, size, s) {
+      // Normalize to -1..1 range roughly
+      const nx = x / 60;
+      const ny = y / 60;
+      const nz = z / 60;
+
+      // Occipital (back) → visual processing
+      if (nz < -0.5) {
+        if (ny < -0.2) return 'visual_processing';
+        return 'scene_processing';
+      }
+
+      // Frontal (front) → attention, reward, emotional regulation
+      if (nz > 0.5) {
+        if (ny > 0.3) return 'attention';
+        if (ny < -0.2) return 'emotional_regulation';
+        return 'reward_motivation';
+      }
+
+      // Temporal (sides, lower) → language, memory, face recognition
+      if (ny < -0.3) {
+        if (nx > 0.3) return 'face_recognition';
+        if (nx < -0.3) return 'language_semantic';
+        return 'memory';
+      }
+
+      // Parietal (top) → social cognition, body/motion
+      if (ny > 0.3) {
+        if (Math.abs(nx) > 0.3) return 'body_motion';
+        return 'social_cognition';
+      }
+
+      // Central defaults
+      if (nx > 0.2) return 'face_recognition';
+      if (nx < -0.2) return 'social_cognition';
+      return 'visual_processing';
+    }
+
+    // ===== ACTIVATION SYSTEM =====
+    function setScenarioActivations(scores) {
+      for (let m = 0; m < allMeshes.length; m++) {
+        const count = vertexCounts[m];
+        const regions = vertexRegions[m];
+        for (let i = 0; i < count; i++) {
+          const base = scores[regions[i]] || 0;
+          const variation = (Math.random() - 0.5) * 0.12;
+          targetActs[m][i] = Math.max(0, Math.min(1, base + variation));
+        }
+      }
+      transitionProgress = 0;
+      controls.autoRotate = false;
+    }
+
+    function activationToColor(value, regionKey, out) {
+      const regionCol = regionColors[regionKey] || regionColors.visual_processing;
+      // Low activation = dark, high activation = bright region color
+      // Add a slight glow boost past 0.7 by pushing toward white
+      if (value < 0.7) {
+        out.lerpColors(colorDark, regionCol, value / 0.7);
+      } else {
+        // Bloom: lerp from region color toward a brighter/white version
+        const t = (value - 0.7) / 0.3;
+        out.copy(regionCol).lerp(new THREE.Color(0xffffff), t * 0.4);
+      }
+    }
+
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    // ===== TOOLTIP =====
+    const tooltip = document.getElementById('tooltip');
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    renderer.domElement.addEventListener('mousemove', (e) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects(allMeshes);
+
+      if (hits.length > 0 && hits[0].face) {
+        const mesh = hits[0].object;
+        const meshIdx = allMeshes.indexOf(mesh);
+        if (meshIdx >= 0) {
+          const vi = hits[0].face.a;
+          const region = vertexRegions[meshIdx][vi];
+          const info = REGIONS[region];
+          const act = currentActs[meshIdx][vi];
+          if (info) {
+            tooltip.textContent = `${info.label}: ${Math.round(act * 100)}%`;
+            tooltip.style.left = `${e.clientX + 14}px`;
+            tooltip.style.top = `${e.clientY - 28}px`;
+            tooltip.style.display = 'block';
+            return;
+          }
+        }
+      }
+      tooltip.style.display = 'none';
+    });
+
+    renderer.domElement.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+    });
+
+    // ===== ANIMATION LOOP =====
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (transitionProgress < 1.0) {
+        transitionProgress = Math.min(1.0, transitionProgress + 0.012);
+        const t = easeInOutCubic(transitionProgress);
+
+        for (let m = 0; m < allMeshes.length; m++) {
+          const colArr = allMeshes[m].geometry.attributes.color.array;
+          const count = vertexCounts[m];
+          const regions = vertexRegions[m];
+
+          for (let i = 0; i < count; i++) {
+            const val = currentActs[m][i] + (targetActs[m][i] - currentActs[m][i]) * t;
+            activationToColor(val, regions[i], tmpColor);
+            colArr[i * 3] = tmpColor.r;
+            colArr[i * 3 + 1] = tmpColor.g;
+            colArr[i * 3 + 2] = tmpColor.b;
+          }
+          allMeshes[m].geometry.attributes.color.needsUpdate = true;
+        }
+
+        if (transitionProgress >= 1.0) {
+          for (let m = 0; m < allMeshes.length; m++) {
+            currentActs[m].set(targetActs[m]);
+          }
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // ===== RESIZE =====
+    new ResizeObserver(() => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }).observe(container);
+
+    // ===== UI: SCENARIO BUTTONS =====
+    const scenariosEl = document.getElementById('scenarios');
+    const barsEl = document.getElementById('engagement-bars');
+    const regionsEl = document.getElementById('region-list');
+    const summaryEl = document.getElementById('summary');
+
+    Object.keys(SCENARIOS).forEach((name, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'scenario-btn';
+      btn.textContent = name;
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activateScenario(name);
+      });
+      scenariosEl.appendChild(btn);
+
+      if (idx === 0) {
+        setTimeout(() => btn.click(), 1500);
+      }
+    });
+
+    function activateScenario(name) {
+      const scenario = SCENARIOS[name];
+      setScenarioActivations(scenario.scores);
+
+      summaryEl.textContent = scenario.summary;
+
+      barsEl.innerHTML = '';
+      const sorted = Object.entries(scenario.scores).sort(([,a], [,b]) => b - a);
+
+      for (const [key, score] of sorted) {
+        const info = REGIONS[key];
+        const pct = Math.round(score * 100);
+        const bar = document.createElement('div');
+        bar.className = 'engagement-bar';
+        bar.innerHTML = `
+          <span class="label">${info.label}</span>
+          <div class="bar-track">
+            <div class="bar-fill" style="background: ${info.color};"></div>
+          </div>
+          <span class="value">${pct}%</span>
+        `;
+        barsEl.appendChild(bar);
+        requestAnimationFrame(() => {
+          bar.querySelector('.bar-fill').style.width = `${pct}%`;
+        });
+      }
+
+      regionsEl.innerHTML = '';
+      for (const [key, score] of sorted.slice(0, 5)) {
+        const info = REGIONS[key];
+        const li = document.createElement('li');
+        li.className = 'region-item';
+        li.innerHTML = `
+          <span class="region-dot" style="background: ${info.color}"></span>
+          <span class="region-name">${info.label}</span>
+          <span class="region-value">${Math.round(score * 100)}%</span>
+        `;
+        regionsEl.appendChild(li);
+      }
+    }
+  </script>
+</body>
+</html>
