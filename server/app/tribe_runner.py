@@ -1,6 +1,6 @@
+import asyncio
 import base64
 import tempfile
-import time
 from pathlib import Path
 
 import numpy as np
@@ -38,6 +38,19 @@ class TribeRunner:
         tmp.close()
         return Path(tmp.name)
 
+    async def _fetch_url(self, url: str, suffix: str) -> Path:
+        """Download media from a URL to a temp file."""
+        import httpx
+
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+
+        tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+        tmp.write(resp.content)
+        tmp.close()
+        return Path(tmp.name)
+
     def _image_to_video(self, image_path: Path, duration: float = 4.0) -> Path:
         """Convert a static image to a short video at 10fps.
 
@@ -45,10 +58,21 @@ class TribeRunner:
         We create a 4-second still video so the model gets ~8 TR segments
         (at 2Hz sampling = 0.5s per TR).
         """
-        from moviepy.editor import ImageClip
+        # Handle both MoviePy 1.x and 2.x APIs
+        try:
+            from moviepy.editor import ImageClip
+        except ImportError:
+            from moviepy import ImageClip
 
         video_path = image_path.with_suffix(".mp4")
-        clip = ImageClip(str(image_path)).set_duration(duration)
+        clip = ImageClip(str(image_path))
+
+        # MoviePy 2.x renamed set_duration() to with_duration()
+        if hasattr(clip, 'with_duration'):
+            clip = clip.with_duration(duration)
+        else:
+            clip = clip.set_duration(duration)
+
         clip.write_videofile(
             str(video_path), codec="libx264", audio=False, fps=10, logger=None
         )
@@ -69,8 +93,8 @@ class TribeRunner:
         Returns averaged vertex activations as a 1D array of ~20,484 values.
 
         Strategy:
-        - Image: Convert to 4s still video, run video prediction
-        - Video: Save directly, run video prediction
+        - Image URL/base64: fetch/decode, convert to 4s still video, run prediction
+        - Video URL/base64: fetch/decode, run video prediction
         - Caption text: Run separately via text_path, combine activations
         - Both visual + caption: weighted average (0.7 visual, 0.3 text)
         """
@@ -80,26 +104,39 @@ class TribeRunner:
         visual_preds = None
         text_preds = None
         temp_files: list[Path] = []
+        loop = asyncio.get_event_loop()
 
         try:
-            # Process visual content
-            if request.image_base64:
+            # Process visual content — prefer URL over base64
+            if request.image_url:
+                img_path = await self._fetch_url(request.image_url, ".jpg")
+                temp_files.append(img_path)
+                video_path = self._image_to_video(img_path)
+                temp_files.append(video_path)
+                visual_preds = await loop.run_in_executor(None, self._run_prediction, video_path)
+
+            elif request.image_base64:
                 img_path = self._save_temp_media(request.image_base64, ".jpg")
                 temp_files.append(img_path)
                 video_path = self._image_to_video(img_path)
                 temp_files.append(video_path)
-                visual_preds = self._run_prediction(video_path)
+                visual_preds = await loop.run_in_executor(None, self._run_prediction, video_path)
+
+            elif request.video_url:
+                video_path = await self._fetch_url(request.video_url, ".mp4")
+                temp_files.append(video_path)
+                visual_preds = await loop.run_in_executor(None, self._run_prediction, video_path)
 
             elif request.video_base64:
                 video_path = self._save_temp_media(request.video_base64, ".mp4")
                 temp_files.append(video_path)
-                visual_preds = self._run_prediction(video_path)
+                visual_preds = await loop.run_in_executor(None, self._run_prediction, video_path)
 
             # Process caption text
             if request.caption:
                 text_path = self._save_caption_text(request.caption)
                 temp_files.append(text_path)
-                text_preds = self._run_text_prediction(text_path)
+                text_preds = await loop.run_in_executor(None, self._run_text_prediction, text_path)
 
             # Combine modalities
             if visual_preds is not None and text_preds is not None:
@@ -114,7 +151,6 @@ class TribeRunner:
             return combined
 
         finally:
-            # Clean up temp files
             for f in temp_files:
                 try:
                     f.unlink()
@@ -132,7 +168,6 @@ class TribeRunner:
         preds, segments = self.model.predict(events_df)
 
         # preds shape: (n_timesteps, n_vertices)
-        # Average across timesteps to get a single activation map
         return preds.mean(axis=0)
 
     def _run_text_prediction(self, text_path: Path) -> np.ndarray:

@@ -1,3 +1,4 @@
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -17,8 +18,9 @@ from .schemas import (
 )
 from .tribe_runner import TribeRunner
 
-# Global instances
-tribe_runner = TribeRunner(cache_dir="./cache")
+# Global instances — cache dir configurable via env for Modal deployment
+cache_dir = os.environ.get("KNOWME_CACHE_DIR", "./cache")
+tribe_runner = TribeRunner(cache_dir=cache_dir)
 brain_mapper = BrainMapper(mesh="fsaverage5")
 mesh_exporter = MeshExporter(mesh="fsaverage5")
 

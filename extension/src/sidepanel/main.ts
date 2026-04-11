@@ -18,19 +18,17 @@ class SidePanelApp {
   private activeTab: 'analysis' | 'history' = 'analysis';
 
   async init(): Promise<void> {
-    // Connect to service worker
     this.port = chrome.runtime.connect({ name: 'sidepanel' });
     this.port.onMessage.addListener((msg: Message) => this.handleMessage(msg));
 
-    // Initialize UI components
     this.analysisPanel = new AnalysisPanel(document.getElementById('analysis-panel')!);
     this.historyPanel = new HistoryPanel(document.getElementById('history-panel')!);
     this.setupGuide = new SetupGuide(document.getElementById('analysis-panel')!);
 
     this.historyPanel.setSelectCallback((result) => this.showAnalysis(result));
     this.setupNavTabs();
+    this.setupSettingsToggle();
 
-    // Load the brain model (bundled GLB — no server needed)
     const container = document.getElementById('brain-container')!;
     this.renderer = new BrainRenderer(container);
 
@@ -42,7 +40,6 @@ class SidePanelApp {
       console.error('[KnowMe] Failed to load brain model:', err);
     }
 
-    // Show setup guide until server connects
     this.setupGuide.show();
   }
 
@@ -74,6 +71,54 @@ class SidePanelApp {
     });
   }
 
+  private setupSettingsToggle(): void {
+    const statusEl = document.getElementById('server-status')!;
+    statusEl.style.cursor = 'pointer';
+    statusEl.title = 'Click to change server URL';
+
+    statusEl.addEventListener('click', () => {
+      const settingsEl = document.getElementById('settings-overlay')!;
+      const isVisible = !settingsEl.classList.contains('hidden');
+
+      if (isVisible) {
+        settingsEl.classList.add('hidden');
+      } else {
+        this.showSettingsOverlay(settingsEl);
+      }
+    });
+  }
+
+  private async showSettingsOverlay(settingsEl: HTMLElement): Promise<void> {
+    const { serverUrl } = await chrome.storage.sync.get({ serverUrl: '' });
+
+    settingsEl.innerHTML = `
+      <div class="settings-content">
+        <div class="settings-header">
+          <strong>Server Settings</strong>
+          <button id="settings-close" class="settings-close-btn">&times;</button>
+        </div>
+        <label for="settings-url">Server URL</label>
+        <div class="setup-url-row">
+          <input id="settings-url" type="url" value="${serverUrl || ''}"
+            placeholder="https://your-name--knowme-serve.modal.run" spellcheck="false">
+          <button id="settings-save" class="btn-primary">Save</button>
+        </div>
+      </div>
+    `;
+    settingsEl.classList.remove('hidden');
+
+    settingsEl.querySelector('#settings-close')?.addEventListener('click', () => {
+      settingsEl.classList.add('hidden');
+    });
+
+    settingsEl.querySelector('#settings-save')?.addEventListener('click', async () => {
+      const input = settingsEl.querySelector('#settings-url') as HTMLInputElement;
+      const url = input.value.trim().replace(/\/+$/, '');
+      await chrome.storage.sync.set({ serverUrl: url });
+      settingsEl.classList.add('hidden');
+    });
+  }
+
   private switchTab(tab: 'analysis' | 'history'): void {
     this.activeTab = tab;
     const analysisEl = document.getElementById('analysis-panel')!;
@@ -95,11 +140,16 @@ class SidePanelApp {
         this.onServerStatus(message.payload);
         break;
 
-      case 'ANALYSIS_LOADING':
-        if (this.activeTab === 'analysis') {
+      case 'ANALYSIS_LOADING': {
+        // Check for cached result before showing spinner
+        const cached = await db.getAnalysis(message.payload.postId);
+        if (cached) {
+          await this.onAnalysisResult(cached);
+        } else if (this.activeTab === 'analysis') {
           this.analysisPanel.showLoading(message.payload.postId);
         }
         break;
+      }
 
       case 'ANALYSIS_RESULT':
         await this.onAnalysisResult(message.payload);
@@ -133,15 +183,12 @@ class SidePanelApp {
   }
 
   private async onAnalysisResult(result: BrainAnalysisResult): Promise<void> {
-    // Use engagement scores for per-region coloring
     this.renderer.updateFromEngagement(result.engagement_scores);
 
-    // Update analysis panel
     if (this.activeTab === 'analysis') {
       this.analysisPanel.showAnalysis(result);
     }
 
-    // Save to IndexedDB
     await db.saveAnalysis(result);
   }
 

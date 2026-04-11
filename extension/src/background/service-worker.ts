@@ -6,19 +6,35 @@ import type {
   BrainMeshData,
 } from '../lib/types';
 
-const API_BASE = 'http://localhost:8000';
-const STATUS_POLL_INTERVAL = 30_000; // 30 seconds
+const DEFAULT_SERVER_URL = 'http://localhost:8000';
+const STATUS_POLL_INTERVAL = 30_000;
 
+let apiBase = DEFAULT_SERVER_URL;
 let serverAvailable = false;
 let sidePanelPort: chrome.runtime.Port | null = null;
 let analysisQueue: InstagramPost | null = null;
 let analyzing = false;
 
+// --- Settings ---
+
+async function loadSettings(): Promise<void> {
+  const { serverUrl } = await chrome.storage.sync.get({ serverUrl: DEFAULT_SERVER_URL });
+  apiBase = serverUrl.replace(/\/+$/, ''); // strip trailing slashes
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && changes.serverUrl) {
+    apiBase = (changes.serverUrl.newValue || DEFAULT_SERVER_URL).replace(/\/+$/, '');
+    serverAvailable = false;
+    checkServerStatus();
+  }
+});
+
 // --- Server health polling ---
 
 async function checkServerStatus(): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}/api/status`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${apiBase}/api/status`, { signal: AbortSignal.timeout(5000) });
     const status: ServerStatus = await res.json();
     serverAvailable = status.model_loaded;
     broadcastToSidePanel({
@@ -39,9 +55,11 @@ async function checkServerStatus(): Promise<void> {
   }
 }
 
-// Poll on startup and periodically
-checkServerStatus();
-setInterval(checkServerStatus, STATUS_POLL_INTERVAL);
+// Initialize settings, then start polling
+loadSettings().then(() => {
+  checkServerStatus();
+  setInterval(checkServerStatus, STATUS_POLL_INTERVAL);
+});
 
 // --- Side panel connection ---
 
@@ -52,7 +70,6 @@ chrome.runtime.onConnect.addListener((port) => {
       sidePanelPort = null;
     });
 
-    // Handle messages from side panel
     port.onMessage.addListener(async (message: Message) => {
       if (message.type === 'GET_BRAIN_MESH') {
         const meshData = await fetchBrainMesh();
@@ -65,7 +82,6 @@ chrome.runtime.onConnect.addListener((port) => {
       }
     });
 
-    // Send current server status immediately
     checkServerStatus();
   }
 });
@@ -75,13 +91,11 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.runtime.onMessage.addListener(
   (message: Message, _sender, _sendResponse) => {
     if (message.type === 'POST_DETECTED') {
-      // Forward to side panel
       broadcastToSidePanel({
         type: 'ANALYSIS_LOADING',
         payload: { postId: message.payload.postId, post: message.payload },
       });
 
-      // Queue analysis
       if (serverAvailable) {
         analyzePost(message.payload);
       }
@@ -94,7 +108,6 @@ chrome.runtime.onMessage.addListener(
 
 async function analyzePost(post: InstagramPost): Promise<void> {
   if (analyzing) {
-    // Queue the latest request, dropping older queued ones
     analysisQueue = post;
     return;
   }
@@ -102,17 +115,20 @@ async function analyzePost(post: InstagramPost): Promise<void> {
   analyzing = true;
 
   try {
+    const isImage = post.mediaType === 'image' || post.mediaType === 'carousel';
+    const isVideo = post.mediaType === 'video';
+
     const body = {
       post_id: post.postId,
-      image_base64: post.mediaType === 'image' || post.mediaType === 'carousel'
-        ? post.mediaSrc
-        : null,
-      video_base64: post.mediaType === 'video' ? post.mediaSrc : null,
+      image_url: isImage ? post.mediaUrl || null : null,
+      video_url: isVideo ? post.mediaUrl || null : null,
+      image_base64: isImage && post.mediaSrc ? post.mediaSrc : null,
+      video_base64: isVideo && post.mediaSrc ? post.mediaSrc : null,
       caption: post.caption,
       media_type: post.mediaType,
     };
 
-    const res = await fetch(`${API_BASE}/api/analyze`, {
+    const res = await fetch(`${apiBase}/api/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -137,7 +153,6 @@ async function analyzePost(post: InstagramPost): Promise<void> {
   } finally {
     analyzing = false;
 
-    // Process queued request
     if (analysisQueue) {
       const next = analysisQueue;
       analysisQueue = null;
@@ -150,7 +165,7 @@ async function analyzePost(post: InstagramPost): Promise<void> {
 
 async function fetchBrainMesh(): Promise<BrainMeshData | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/brain-mesh`);
+    const res = await fetch(`${apiBase}/api/brain-mesh`);
     if (!res.ok) return null;
     return await res.json();
   } catch {

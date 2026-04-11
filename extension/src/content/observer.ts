@@ -1,7 +1,7 @@
 import type { InstagramPost } from '../lib/types';
 import type { PostDetectedMessage } from '../lib/messages';
 import { extractPostData, getMediaElement } from './extractor';
-import { captureMedia } from './media-capture';
+import { extractMediaUrl, captureVideoFrame } from './media-capture';
 
 /**
  * Observes the Instagram feed for currently visible posts.
@@ -18,16 +18,13 @@ export class InstagramObserver {
   start(): void {
     console.log('[KnowMe] Starting Instagram feed observer');
 
-    // Set up IntersectionObserver for viewport detection
     this.intersectionObserver = new IntersectionObserver(
       (entries) => this.onIntersection(entries),
-      { threshold: 0.5 } // 50% visible
+      { threshold: 0.5 }
     );
 
-    // Observe existing articles
     this.observeArticles();
 
-    // Watch for new articles added to the DOM (infinite scroll)
     this.mutationObserver = new MutationObserver(() => {
       this.observeArticles();
     });
@@ -65,10 +62,11 @@ export class InstagramObserver {
       const postData = extractPostData(article);
       if (!postData) continue;
 
-      // Skip if we already analyzed this post or it's the current one
+      // Skip if it's the same post we're already showing
       if (postData.postId === this.currentPostId) continue;
+
+      // For previously analyzed posts, notify side panel to re-display cached result
       if (this.analyzedPosts.has(postData.postId)) {
-        // Still notify the side panel to re-show cached results
         this.currentPostId = postData.postId;
         this.sendMessage({
           type: 'POST_DETECTED',
@@ -79,24 +77,26 @@ export class InstagramObserver {
 
       this.currentPostId = postData.postId;
 
-      // Capture media
+      // Extract media — prefer direct URL (avoids CORS), fall back to canvas for videos
       const mediaElement = getMediaElement(article);
       if (mediaElement) {
-        const captured = await captureMedia(mediaElement);
-        if (captured) {
-          // For v1, video frames are sent as images
-          postData.mediaSrc = captured.base64;
-          if (captured.isVideo) {
-            // We captured a frame, but mark as image since we're
-            // sending a still frame to the server
-            postData.mediaType = 'image';
+        const url = extractMediaUrl(mediaElement);
+        if (url) {
+          postData.mediaUrl = url;
+        }
+
+        // For videos without a fetchable URL, try canvas frame capture
+        if (!url && mediaElement instanceof HTMLVideoElement) {
+          const frame = await captureVideoFrame(mediaElement);
+          if (frame) {
+            postData.mediaSrc = frame;
+            postData.mediaType = 'image'; // sending a still frame
           }
         }
       }
 
       this.analyzedPosts.add(postData.postId);
 
-      // Send to background service worker
       this.sendMessage({
         type: 'POST_DETECTED',
         payload: postData,
@@ -108,7 +108,6 @@ export class InstagramObserver {
     try {
       chrome.runtime.sendMessage(message);
     } catch (err) {
-      // Extension context may be invalidated if the extension was reloaded
       console.warn('[KnowMe] Failed to send message:', err);
     }
   }

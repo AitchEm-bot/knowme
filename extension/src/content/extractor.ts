@@ -18,7 +18,8 @@ export function extractPostData(article: HTMLElement): InstagramPost | null {
     username: username || 'unknown',
     caption,
     mediaType: mediaInfo.type,
-    mediaSrc: '', // filled by media-capture.ts
+    mediaSrc: '',
+    mediaUrl: '',
     permalink: `https://www.instagram.com/p/${postId}/`,
     timestamp: new Date().toISOString(),
   };
@@ -43,7 +44,7 @@ function extractUsername(article: HTMLElement): string | null {
       const href = profileLink.getAttribute('href');
       if (href) {
         const username = href.replace(/\//g, '');
-        if (username && !username.includes('p') && username.length < 50) {
+        if (username && !username.startsWith('p/') && !username.startsWith('reel/') && username.length < 50) {
           return username;
         }
       }

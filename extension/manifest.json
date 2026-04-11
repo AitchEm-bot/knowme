@@ -6,7 +6,10 @@
   "permissions": ["sidePanel", "activeTab", "storage"],
   "host_permissions": [
     "https://www.instagram.com/*",
-    "http://localhost:8000/*"
+    "https://*.cdninstagram.com/*",
+    "https://*.fbcdn.net/*",
+    "http://localhost:*/*",
+    "https://*.modal.run/*"
   ],
   "side_panel": {
     "default_path": "sidepanel/index.html"

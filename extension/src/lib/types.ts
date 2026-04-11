@@ -5,7 +5,8 @@ export interface InstagramPost {
   username: string;
   caption: string | null;
   mediaType: 'image' | 'video' | 'carousel';
-  mediaSrc: string; // base64 encoded
+  mediaSrc: string; // base64 encoded (fallback)
+  mediaUrl: string; // direct URL to media (preferred)
   permalink: string;
   timestamp: string;
 }
