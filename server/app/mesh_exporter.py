@@ -35,20 +35,24 @@ class MeshExporter:
         }
 
     def _load_mesh_file(self, filepath: str) -> tuple[np.ndarray, np.ndarray]:
-        """Load a FreeSurfer mesh file, handling both .pial and .gii formats."""
+        """Load a FreeSurfer mesh file, handling both binary and GIfTI formats."""
+        import nibabel as nib
         filepath = str(filepath)
 
-        if filepath.endswith(".gii"):
-            import nibabel as nib
+        # Try GIfTI first (newer nilearn versions may return .gii without the extension)
+        try:
             gii = nib.load(filepath)
-            coords = gii.darrays[0].data
-            faces = gii.darrays[1].data
-            return coords, faces
-        else:
-            # FreeSurfer binary format
-            from nibabel.freesurfer import read_geometry
-            coords, faces = read_geometry(filepath)
-            return coords, faces
+            if hasattr(gii, "darrays") and len(gii.darrays) >= 2:
+                coords = gii.darrays[0].data
+                faces = gii.darrays[1].data
+                return coords, faces
+        except Exception:
+            pass
+
+        # Fall back to FreeSurfer binary format
+        from nibabel.freesurfer import read_geometry
+        coords, faces = read_geometry(filepath)
+        return coords, faces
 
     def get_mesh_data(self) -> dict:
         """Return the mesh data as a JSON-serializable dict."""

@@ -5,7 +5,8 @@
       "Bash(npm run:*)",
       "Bash(git init:*)",
       "Bash(unzip -o neural_networks_of_the_brain.zip -d brain_model_tmp)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npx ctx7@latest:*)"
     ]
   }
 }

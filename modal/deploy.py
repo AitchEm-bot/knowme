@@ -2,7 +2,7 @@
 KnowMe — Modal deployment for TRIBE v2 brain encoding.
 
 Deploy:
-    modal deploy modal/app.py
+    modal deploy modal/deploy.py
 
 The deploy command prints the endpoint URL. Paste it into the
 KnowMe Chrome extension settings to connect.
@@ -12,12 +12,14 @@ from pathlib import Path
 
 import modal
 
+server_path = Path(__file__).parent.parent / "server"
+
 # ---------------------------------------------------------------------------
-# Container image — bake all Python deps so cold starts only load model weights
+# Container image — bake all Python deps + server source code
 # ---------------------------------------------------------------------------
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("ffmpeg", "libgl1-mesa-glx", "libglib2.0-0")
+    .apt_install("ffmpeg", "libgl1-mesa-glx", "libglib2.0-0", "git")
     .pip_install(
         "fastapi>=0.115.0",
         "tribev2 @ git+https://github.com/facebookresearch/tribev2.git",
@@ -30,6 +32,7 @@ image = (
         "moviepy>=1.0",
         "httpx>=0.27",
     )
+    .add_local_dir(server_path, remote_path="/root/server")
 )
 
 # Persistent volume to cache TRIBE v2 model weights (~15 GB) across restarts
@@ -37,15 +40,11 @@ volume = modal.Volume.from_name("knowme-model-cache", create_if_missing=True)
 
 app = modal.App("knowme", image=image)
 
-# Mount the server/ source tree into the container
-server_path = Path(__file__).parent.parent / "server"
-
 
 @app.function(
     gpu="A100",
     volumes={"/cache": volume},
-    mounts=[modal.Mount.from_local_dir(server_path, remote_path="/root/server")],
-    container_idle_timeout=300,  # keep warm for 5 min after last request
+    scaledown_window=300,        # keep warm for 5 min after last request
     timeout=600,                 # allow up to 10 min per request (first-run model download)
 )
 @modal.asgi_app()
@@ -57,7 +56,11 @@ def serve():
     # Point the server at the Modal volume for model weight caching
     os.environ["KNOWME_CACHE_DIR"] = "/cache"
 
-    # Make the mounted server package importable
+    # Cache nilearn/MNE data on the volume so it persists across cold starts
+    os.environ["NILEARN_DATA"] = "/cache/nilearn"
+    os.environ["MNE_DATA"] = "/cache/mne"
+
+    # Make the server package importable
     sys.path.insert(0, "/root/server")
 
     from app.main import app as fastapi_app
