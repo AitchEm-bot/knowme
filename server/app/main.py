@@ -74,10 +74,16 @@ async def analyze_post(request: AnalysisRequest):
     if not tribe_runner.is_loaded:
         raise HTTPException(status_code=503, detail="Model not loaded yet")
 
+    has_media = request.image_url or request.image_base64 or request.video_url or request.video_base64
+    if not has_media and not request.caption:
+        raise HTTPException(status_code=400, detail="No media or caption provided")
+
     start = time.time()
 
     try:
         vertex_activations = await tribe_runner.analyze(request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
 

@@ -33,6 +33,11 @@ export interface AnalysisLoadingMessage {
 }
 
 // Side panel -> Background
+export interface CheckStatusMessage {
+  type: 'CHECK_STATUS';
+  payload: null;
+}
+
 export interface GetBrainMeshMessage {
   type: 'GET_BRAIN_MESH';
   payload: null;
@@ -49,5 +54,6 @@ export type Message =
   | AnalysisErrorMessage
   | ServerStatusMessage
   | AnalysisLoadingMessage
+  | CheckStatusMessage
   | GetBrainMeshMessage
   | BrainMeshResponseMessage;

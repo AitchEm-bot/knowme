@@ -79,6 +79,11 @@ export const db = {
     return this.getMeta<BrainMeshData>('brain-mesh');
   },
 
+  async deleteAnalysis(postId: string): Promise<void> {
+    const database = await getDB();
+    await database.delete('analyses', postId);
+  },
+
   async clearAll(): Promise<void> {
     const database = await getDB();
     await database.clear('analyses');

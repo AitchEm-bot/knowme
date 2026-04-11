@@ -36,23 +36,26 @@ function extractPostId(article: HTMLElement): string | null {
 }
 
 function extractUsername(article: HTMLElement): string | null {
-  // Instagram header typically has a link to the profile
-  const header = article.querySelector('header');
-  if (header) {
-    const profileLink = header.querySelector<HTMLAnchorElement>('a[href^="/"]');
-    if (profileLink) {
-      const href = profileLink.getAttribute('href');
-      if (href) {
-        const username = href.replace(/\//g, '');
-        if (username && !username.startsWith('p/') && !username.startsWith('reel/') && username.length < 50) {
-          return username;
-        }
-      }
+  // Look for profile links anywhere in the article (not just header — Instagram DOM changes)
+  const profileLinks = article.querySelectorAll<HTMLAnchorElement>('a[href^="/"][role="link"]');
+  for (const link of profileLinks) {
+    const href = link.getAttribute('href');
+    if (!href) continue;
+    const username = href.replace(/\//g, '');
+    if (
+      username &&
+      username.length < 50 &&
+      !username.startsWith('p/') &&
+      !username.startsWith('reel/') &&
+      !username.includes('explore') &&
+      /^[a-zA-Z0-9._]+$/.test(username)
+    ) {
+      return username;
     }
   }
 
-  // Fallback: look for any span/a with a short text that looks like a username
-  const spans = article.querySelectorAll('header span, header a');
+  // Fallback: look for spans/links with username-like text
+  const spans = article.querySelectorAll('span, a');
   for (const el of spans) {
     const text = el.textContent?.trim();
     if (text && text.length > 0 && text.length < 30 && /^[a-zA-Z0-9._]+$/.test(text)) {

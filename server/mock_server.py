@@ -1,0 +1,86 @@
+"""
+Mock KnowMe server for local extension testing.
+Returns fake brain analysis results instantly — no GPU needed.
+
+Usage:
+    cd server
+    .venv/Scripts/python mock_server.py
+"""
+
+import random
+import time
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class AnalysisRequest(BaseModel):
+    post_id: str
+    image_url: str | None = None
+    video_url: str | None = None
+    image_base64: str | None = None
+    video_base64: str | None = None
+    caption: str | None = None
+    media_type: str | None = None
+
+
+@app.get("/api/status")
+async def status():
+    return {
+        "status": "ready",
+        "model_loaded": True,
+        "gpu_available": True,
+        "gpu_name": "Mock GPU",
+    }
+
+
+@app.post("/api/analyze")
+async def analyze(req: AnalysisRequest):
+    n_vertices = 20484
+    vertex_activations = [random.random() for _ in range(n_vertices)]
+
+    regions = [
+        {"region_name": "L_V1", "full_name": "Primary Visual Cortex", "hemisphere": "left", "activation": round(random.random(), 4), "category": "visual_processing", "description": "Primary visual cortex"},
+        {"region_name": "R_FFC", "full_name": "Fusiform Face Complex", "hemisphere": "right", "activation": round(random.random(), 4), "category": "face_recognition", "description": "Face processing"},
+        {"region_name": "L_TPOJ1", "full_name": "Temporoparietal-Occipital Junction 1", "hemisphere": "left", "activation": round(random.random(), 4), "category": "social_cognition", "description": "Social cognition"},
+        {"region_name": "R_OFC", "full_name": "Orbitofrontal Cortex", "hemisphere": "right", "activation": round(random.random(), 4), "category": "reward_motivation", "description": "Reward evaluation"},
+        {"region_name": "L_H", "full_name": "Hippocampus", "hemisphere": "left", "activation": round(random.random(), 4), "category": "memory", "description": "Memory formation"},
+    ]
+
+    engagement_scores = {
+        "Visual Processing": round(random.uniform(0.3, 0.9), 4),
+        "Face Recognition": round(random.uniform(0.2, 0.8), 4),
+        "Social & Emotional Processing": round(random.uniform(0.2, 0.7), 4),
+        "Reward & Motivation": round(random.uniform(0.1, 0.6), 4),
+        "Language & Semantics": round(random.uniform(0.1, 0.5), 4),
+        "Attention & Spatial Awareness": round(random.uniform(0.2, 0.7), 4),
+        "Memory Encoding": round(random.uniform(0.1, 0.5), 4),
+        "Emotional Regulation": round(random.uniform(0.1, 0.4), 4),
+    }
+
+    print(f"[Mock] Analyzed post {req.post_id} | media_type={req.media_type} | has_url={bool(req.image_url or req.video_url)}")
+
+    return {
+        "post_id": req.post_id,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "regions": regions,
+        "vertex_activations": vertex_activations,
+        "summary": "This content engages strong visual processing (72%), moderate face recognition (58%), and mild social cognition (34%).",
+        "engagement_scores": engagement_scores,
+        "processing_time_ms": random.randint(50, 200),
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    print("[Mock] Starting mock KnowMe server on http://localhost:8000")
+    uvicorn.run(app, host="0.0.0.0", port=8000)

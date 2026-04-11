@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KnowMe",
-  "version": "0.1.0",
+  "version": "0.1.16",
   "description": "Visualize predicted brain responses to your Instagram feed using Meta's TRIBE v2",
   "permissions": ["sidePanel", "activeTab", "storage"],
   "host_permissions": [

@@ -2,9 +2,15 @@ const DEFAULT_SERVER_URL = 'http://localhost:8000';
 
 export class SetupGuide {
   private container: HTMLElement;
+  private onConnected?: () => void;
+  private visible = false;
 
   constructor(container: HTMLElement) {
     this.container = container;
+  }
+
+  setConnectedCallback(cb: () => void): void {
+    this.onConnected = cb;
   }
 
   show(): void {
@@ -89,12 +95,19 @@ export class SetupGuide {
       </div>
     `;
 
+    this.visible = true;
     this.loadSavedUrl();
     this.bindEvents();
   }
 
   hide(): void {
+    if (!this.visible) return;
+    this.visible = false;
     this.container.innerHTML = '';
+  }
+
+  get isVisible(): boolean {
+    return this.visible;
   }
 
   updateStatus(connected: boolean): void {
@@ -145,9 +158,21 @@ export class SetupGuide {
 
     await chrome.storage.sync.set({ serverUrl: url });
 
-    // Give the service worker a moment to pick up the change and poll
-    setTimeout(() => {
-      feedback.textContent = 'URL saved. Checking connection...';
-    }, 500);
+    // Check server directly — Modal cold starts can take 1-2 min
+    try {
+      const res = await fetch(`${url}/api/status`, { signal: AbortSignal.timeout(60_000) });
+      const status = await res.json();
+      if (status.model_loaded) {
+        feedback.textContent = 'Connected!';
+        feedback.className = 'setup-feedback setup-feedback-success';
+        this.onConnected?.();
+      } else {
+        feedback.textContent = 'Server found, model is loading... this may take a minute.';
+        feedback.className = 'setup-feedback setup-feedback-loading';
+      }
+    } catch {
+      feedback.textContent = 'Could not reach server. If using Modal, it may still be cold-starting — try again in 30s.';
+      feedback.className = 'setup-feedback setup-feedback-error';
+    }
   }
 }

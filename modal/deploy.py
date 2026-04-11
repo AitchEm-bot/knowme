@@ -32,6 +32,10 @@ image = (
         "moviepy>=1.0",
         "httpx>=0.27",
     )
+    .run_commands(
+        "python -c \"import mne; mne.datasets.sample.data_path()\"",
+        "python -c \"from nilearn.datasets import fetch_surf_fsaverage; fetch_surf_fsaverage('fsaverage5')\"",
+    )
     .add_local_dir(server_path, remote_path="/root/server")
 )
 
@@ -46,17 +50,25 @@ app = modal.App("knowme", image=image)
     volumes={"/cache": volume},
     scaledown_window=300,        # keep warm for 5 min after last request
     timeout=600,                 # allow up to 10 min per request (first-run model download)
+    max_containers=1,            # only one A100 container at a time
 )
+@modal.concurrent(max_inputs=10)
 @modal.asgi_app()
 def serve():
     """Serve the KnowMe FastAPI app on a Modal A100 GPU."""
     import os
     import sys
 
-    # Point the server at the Modal volume for model weight caching
+    # Point all data/model downloads at the persistent volume
     os.environ["KNOWME_CACHE_DIR"] = "/cache"
+    os.environ["HF_HOME"] = "/cache/huggingface"
 
-    # Cache nilearn/MNE data on the volume so it persists across cold starts
+    # Limit DataLoader workers to available CPUs (TRIBE v2 defaults to 20)
+    import multiprocessing
+    os.environ["KNOWME_NUM_WORKERS"] = str(min(multiprocessing.cpu_count(), 16))
+    os.makedirs("/cache/huggingface", exist_ok=True)
+    os.makedirs("/cache/nilearn", exist_ok=True)
+    os.makedirs("/cache/mne", exist_ok=True)
     os.environ["NILEARN_DATA"] = "/cache/nilearn"
     os.environ["MNE_DATA"] = "/cache/mne"
 

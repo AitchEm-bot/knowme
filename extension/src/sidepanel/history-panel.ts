@@ -26,19 +26,28 @@ export class HistoryPanel {
       return;
     }
 
-    // Stats summary
+    // Stats summary + clear all
     const stats = this.computeStats(history);
     const statsEl = document.createElement('div');
-    statsEl.style.cssText = 'padding: 12px 0; margin-bottom: 12px; border-bottom: 1px solid #1a1a2e;';
+    statsEl.className = 'history-stats';
     statsEl.innerHTML = `
-      <div style="font-size: 12px; color: #888; margin-bottom: 4px;">
-        ${history.length} posts analyzed
+      <div>
+        <div style="font-size: 12px; color: #888; margin-bottom: 4px;">
+          ${history.length} posts analyzed
+        </div>
+        <div style="font-size: 11px; color: #666;">
+          Most engaged: ${stats.topCategory}
+        </div>
       </div>
-      <div style="font-size: 11px; color: #666;">
-        Most engaged: ${stats.topCategory}
-      </div>
+      <button class="history-clear-all" title="Clear all history">Clear All</button>
     `;
     this.container.appendChild(statsEl);
+
+    statsEl.querySelector('.history-clear-all')?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await db.clearAll();
+      this.render();
+    });
 
     // History list
     for (const result of history) {
@@ -71,7 +80,18 @@ export class HistoryPanel {
     }
 
     meta.append(user, time, summary);
-    item.appendChild(meta);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'history-delete-btn';
+    deleteBtn.innerHTML = '&times;';
+    deleteBtn.title = 'Delete this analysis';
+    deleteBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await db.deleteAnalysis(result.post_id);
+      item.remove();
+    });
+
+    item.append(meta, deleteBtn);
 
     item.addEventListener('click', () => {
       this.onSelect?.(result);

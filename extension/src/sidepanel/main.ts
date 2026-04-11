@@ -16,16 +16,22 @@ class SidePanelApp {
   private port!: chrome.runtime.Port;
   private serverConnected = false;
   private activeTab: 'analysis' | 'history' = 'analysis';
+  private currentAnalyzingPostId: string | null = null;
+  private lastProcessedResultTs = 0;
 
   async init(): Promise<void> {
-    this.port = chrome.runtime.connect({ name: 'sidepanel' });
-    this.port.onMessage.addListener((msg: Message) => this.handleMessage(msg));
+    this.connectPort();
+    this.listenForStorageFallback();
+    this.startResultPolling();
 
     this.analysisPanel = new AnalysisPanel(document.getElementById('analysis-panel')!);
     this.historyPanel = new HistoryPanel(document.getElementById('history-panel')!);
     this.setupGuide = new SetupGuide(document.getElementById('analysis-panel')!);
 
     this.historyPanel.setSelectCallback((result) => this.showAnalysis(result));
+    this.setupGuide.setConnectedCallback(() => {
+      this.setupGuide.hide();
+    });
     this.setupNavTabs();
     this.setupSettingsToggle();
 
@@ -41,6 +47,11 @@ class SidePanelApp {
     }
 
     this.setupGuide.show();
+
+    const versionTag = document.getElementById('version-tag');
+    if (versionTag) {
+      versionTag.textContent = `v${chrome.runtime.getManifest().version}`;
+    }
   }
 
   private setupNavTabs(): void {
@@ -59,15 +70,23 @@ class SidePanelApp {
     historyTab.textContent = 'History';
     historyTab.dataset.tab = 'history';
 
-    nav.append(analysisTab, historyTab);
+    const refreshBtn = document.createElement('button');
+    refreshBtn.className = 'nav-action-btn';
+    refreshBtn.title = 'Clear current analysis';
+    refreshBtn.innerHTML = '&#x21bb;';
+    refreshBtn.addEventListener('click', () => {
+      this.resetAnalysis();
+      this.port.postMessage({ type: 'CHECK_STATUS', payload: null });
+    });
+
+    nav.append(analysisTab, historyTab, refreshBtn);
     header.after(nav);
 
     nav.addEventListener('click', (e) => {
       const tab = (e.target as HTMLElement).dataset.tab;
       if (!tab) return;
       this.switchTab(tab as 'analysis' | 'history');
-      nav.querySelectorAll('.nav-tab').forEach((t) => t.classList.remove('active'));
-      (e.target as HTMLElement).classList.add('active');
+      this.syncTabUI(tab as 'analysis' | 'history');
     });
   }
 
@@ -119,6 +138,66 @@ class SidePanelApp {
     });
   }
 
+  private listenForStorageFallback(): void {
+    // Listen for new results written by the service worker
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes.lastResult) return;
+      const msg = changes.lastResult.newValue;
+      if (!msg) return;
+      console.log('[KnowMe:SP] Storage fallback fired:', msg.type, 'ts:', msg.ts);
+      this.handleStorageResult(msg);
+    });
+  }
+
+  private handleStorageResult(msg: { type: string; payload: unknown; ts: number }): void {
+    // Skip if already processed
+    if (msg.ts <= this.lastProcessedResultTs) {
+      console.log('[KnowMe:SP] Storage result skipped (already processed), ts:', msg.ts);
+      return;
+    }
+    this.lastProcessedResultTs = msg.ts;
+
+    if (msg.type === 'ANALYSIS_RESULT') {
+      this.currentAnalyzingPostId = null;
+      this.onAnalysisResult(msg.payload as BrainAnalysisResult);
+    } else if (msg.type === 'ANALYSIS_ERROR') {
+      this.currentAnalyzingPostId = null;
+      const err = msg.payload as { error: string };
+      this.analysisPanel.showError(err.error);
+    }
+  }
+
+  private connectPort(): void {
+    try {
+      this.port = chrome.runtime.connect({ name: 'sidepanel' });
+      console.log('[KnowMe:SP] Port connected');
+      this.port.onMessage.addListener((msg: Message) => this.handleMessage(msg));
+      this.port.onDisconnect.addListener(() => {
+        console.warn('[KnowMe:SP] Port disconnected, reconnecting in 1s...');
+        setTimeout(() => {
+          this.connectPort();
+          this.checkForMissedResults();
+        }, 1000);
+      });
+    } catch (err) {
+      console.error('[KnowMe:SP] Port connect FAILED:', err);
+    }
+  }
+
+  private async checkForMissedResults(): Promise<void> {
+    const { lastResult } = await chrome.storage.local.get('lastResult');
+    if (!lastResult) return;
+    this.handleStorageResult(lastResult);
+  }
+
+  private startResultPolling(): void {
+    // Poll storage every 5s as ultimate fallback while waiting for analysis
+    setInterval(async () => {
+      if (!this.currentAnalyzingPostId) return;
+      await this.checkForMissedResults();
+    }, 5000);
+  }
+
   private switchTab(tab: 'analysis' | 'history'): void {
     this.activeTab = tab;
     const analysisEl = document.getElementById('analysis-panel')!;
@@ -135,30 +214,34 @@ class SidePanelApp {
   }
 
   private async handleMessage(message: Message): Promise<void> {
+    console.log('[KnowMe:SP] handleMessage:', message.type);
     switch (message.type) {
       case 'SERVER_STATUS':
         this.onServerStatus(message.payload);
         break;
 
       case 'ANALYSIS_LOADING': {
-        // Check for cached result before showing spinner
+        this.currentAnalyzingPostId = message.payload.postId;
         const cached = await db.getAnalysis(message.payload.postId);
         if (cached) {
+          this.currentAnalyzingPostId = null;
           await this.onAnalysisResult(cached);
-        } else if (this.activeTab === 'analysis') {
+        } else {
+          this.switchTab('analysis');
+          this.syncTabUI('analysis');
           this.analysisPanel.showLoading(message.payload.postId);
         }
         break;
       }
 
       case 'ANALYSIS_RESULT':
+        this.currentAnalyzingPostId = null;
         await this.onAnalysisResult(message.payload);
         break;
 
       case 'ANALYSIS_ERROR':
-        if (this.activeTab === 'analysis') {
-          this.analysisPanel.showError(message.payload.error);
-        }
+        this.currentAnalyzingPostId = null;
+        this.analysisPanel.showError(message.payload.error);
         break;
     }
   }
@@ -170,7 +253,10 @@ class SidePanelApp {
     if (status.model_loaded) {
       statusEl.textContent = 'Connected';
       statusEl.className = 'online';
-      this.setupGuide.hide();
+      // Only hide setup guide if it's currently showing — never touch analysis-panel otherwise
+      if (this.setupGuide.isVisible) {
+        this.setupGuide.hide();
+      }
     } else if (status.status === 'loading') {
       statusEl.textContent = 'Loading model...';
       statusEl.className = 'loading';
@@ -183,23 +269,39 @@ class SidePanelApp {
   }
 
   private async onAnalysisResult(result: BrainAnalysisResult): Promise<void> {
-    this.renderer.updateFromEngagement(result.engagement_scores);
-
-    if (this.activeTab === 'analysis') {
+    console.log('[KnowMe:SP] onAnalysisResult:', result.post_id, '| scores:', Object.keys(result.engagement_scores || {}).length);
+    try {
+      this.renderer.updateFromEngagement(result.engagement_scores);
+      this.switchTab('analysis');
+      this.syncTabUI('analysis');
       this.analysisPanel.showAnalysis(result);
+      await db.saveAnalysis(result);
+      console.log('[KnowMe:SP] Analysis displayed and saved');
+    } catch (err) {
+      console.error('[KnowMe:SP] onAnalysisResult CRASHED:', err);
     }
-
-    await db.saveAnalysis(result);
   }
 
   private async showAnalysis(result: BrainAnalysisResult): Promise<void> {
     this.renderer.updateFromEngagement(result.engagement_scores);
     this.switchTab('analysis');
+    this.syncTabUI('analysis');
     this.analysisPanel.showAnalysis(result);
+  }
 
+  private syncTabUI(tab: 'analysis' | 'history'): void {
     document.querySelectorAll('.nav-tab').forEach((t) => {
-      t.classList.toggle('active', t.textContent === 'Analysis');
+      const btn = t as HTMLElement;
+      btn.classList.toggle('active', btn.dataset.tab === tab);
     });
+  }
+
+  private resetAnalysis(): void {
+    this.currentAnalyzingPostId = null;
+    this.analysisPanel.clear();
+    this.renderer.updateFromEngagement({});
+    this.switchTab('analysis');
+    this.syncTabUI('analysis');
   }
 }
 

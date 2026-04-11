@@ -7,7 +7,6 @@ import type {
 } from '../lib/types';
 
 const DEFAULT_SERVER_URL = 'http://localhost:8000';
-const STATUS_POLL_INTERVAL = 30_000;
 
 let apiBase = DEFAULT_SERVER_URL;
 let serverAvailable = false;
@@ -30,19 +29,32 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-// --- Server health polling ---
+// --- Server status check (on-demand, retries on failure) ---
 
-async function checkServerStatus(): Promise<void> {
+let statusRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function checkServerStatus(retries = 5): Promise<void> {
+  // Clear any pending retry
+  if (statusRetryTimer) {
+    clearTimeout(statusRetryTimer);
+    statusRetryTimer = null;
+  }
+
   try {
-    const res = await fetch(`${apiBase}/api/status`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${apiBase}/api/status`, { signal: AbortSignal.timeout(30_000) });
     const status: ServerStatus = await res.json();
     serverAvailable = status.model_loaded;
     broadcastToSidePanel({
       type: 'SERVER_STATUS',
       payload: status,
     });
+
+    // If model is still loading, keep retrying
+    if (!status.model_loaded && retries > 0) {
+      console.log('[KnowMe:SW] Model still loading, retrying in 10s...');
+      statusRetryTimer = setTimeout(() => checkServerStatus(retries - 1), 10_000);
+    }
   } catch {
-    serverAvailable = false;
     broadcastToSidePanel({
       type: 'SERVER_STATUS',
       payload: {
@@ -52,14 +64,18 @@ async function checkServerStatus(): Promise<void> {
         gpu_name: null,
       },
     });
+
+    // Server unreachable — retry with backoff (cold start can take 1-2 min)
+    if (retries > 0) {
+      const delay = retries > 3 ? 10_000 : 20_000;
+      console.log(`[KnowMe:SW] Server unreachable, retrying in ${delay / 1000}s (${retries} left)...`);
+      statusRetryTimer = setTimeout(() => checkServerStatus(retries - 1), delay);
+    }
   }
 }
 
-// Initialize settings, then start polling
-loadSettings().then(() => {
-  checkServerStatus();
-  setInterval(checkServerStatus, STATUS_POLL_INTERVAL);
-});
+// Initialize settings — keep the promise so analyzePost can await it
+const settingsReady = loadSettings();
 
 // --- Side panel connection ---
 
@@ -71,7 +87,9 @@ chrome.runtime.onConnect.addListener((port) => {
     });
 
     port.onMessage.addListener(async (message: Message) => {
-      if (message.type === 'GET_BRAIN_MESH') {
+      if (message.type === 'CHECK_STATUS') {
+        checkServerStatus();
+      } else if (message.type === 'GET_BRAIN_MESH') {
         const meshData = await fetchBrainMesh();
         if (meshData) {
           port.postMessage({
@@ -91,14 +109,24 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.runtime.onMessage.addListener(
   (message: Message, _sender, _sendResponse) => {
     if (message.type === 'POST_DETECTED') {
+      const post = message.payload;
+      const hasMedia = post.mediaUrl || post.mediaSrc;
+      const hasCaption = post.caption;
+
+      if (!hasMedia && !hasCaption) {
+        console.warn('[KnowMe] Skipping post with no media or caption:', post.postId);
+        return false;
+      }
+
+      console.log('[KnowMe:SW] POST_DETECTED received:', post.postId, '| port alive:', !!sidePanelPort);
+
       broadcastToSidePanel({
         type: 'ANALYSIS_LOADING',
-        payload: { postId: message.payload.postId, post: message.payload },
+        payload: { postId: post.postId, post },
       });
 
-      if (serverAvailable) {
-        analyzePost(message.payload);
-      }
+      // Always attempt — don't gate on serverAvailable since it resets on SW restart
+      analyzePost(post);
     }
     return false;
   }
@@ -113,18 +141,23 @@ async function analyzePost(post: InstagramPost): Promise<void> {
   }
 
   analyzing = true;
+  console.log('[KnowMe:SW] analyzePost starting for:', post.postId, '| apiBase:', apiBase);
 
   try {
+    // Ensure settings (serverUrl) are loaded before fetching — critical after SW restart
+    await settingsReady;
+    console.log('[KnowMe:SW] Settings loaded, apiBase:', apiBase);
+
     const isImage = post.mediaType === 'image' || post.mediaType === 'carousel';
     const isVideo = post.mediaType === 'video';
 
     const body = {
       post_id: post.postId,
-      image_url: isImage ? post.mediaUrl || null : null,
-      video_url: isVideo ? post.mediaUrl || null : null,
+      image_url: isImage && post.mediaUrl ? post.mediaUrl : null,
+      video_url: isVideo && post.mediaUrl ? post.mediaUrl : null,
       image_base64: isImage && post.mediaSrc ? post.mediaSrc : null,
       video_base64: isVideo && post.mediaSrc ? post.mediaSrc : null,
-      caption: post.caption,
+      caption: post.caption || null,
       media_type: post.mediaType,
     };
 
@@ -132,6 +165,7 @@ async function analyzePost(post: InstagramPost): Promise<void> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(300_000), // 5 min max per analysis
     });
 
     if (!res.ok) {
@@ -141,15 +175,30 @@ async function analyzePost(post: InstagramPost): Promise<void> {
 
     const result: BrainAnalysisResponse = await res.json();
 
+    // Server responded — confirm it's available
+    serverAvailable = true;
+
+    const payload = { ...result, post };
+    console.log('[KnowMe:SW] Analysis SUCCESS for:', post.postId, '| port alive:', !!sidePanelPort);
+
     broadcastToSidePanel({
       type: 'ANALYSIS_RESULT',
-      payload: { ...result, post },
+      payload,
     });
+
+    // Fallback: persist to storage so the side panel can pick it up even if the port is dead
+    chrome.storage.local.set({ lastResult: { type: 'ANALYSIS_RESULT', payload, ts: Date.now() } });
+    console.log('[KnowMe:SW] Wrote result to storage fallback');
   } catch (error) {
+    console.error('[KnowMe:SW] Analysis FAILED for:', post.postId, error);
+    const errorPayload = { postId: post.postId, error: String(error) };
+
     broadcastToSidePanel({
       type: 'ANALYSIS_ERROR',
-      payload: { postId: post.postId, error: String(error) },
+      payload: errorPayload,
     });
+
+    chrome.storage.local.set({ lastResult: { type: 'ANALYSIS_ERROR', payload: errorPayload, ts: Date.now() } });
   } finally {
     analyzing = false;
 
@@ -176,7 +225,17 @@ async function fetchBrainMesh(): Promise<BrainMeshData | null> {
 // --- Utility ---
 
 function broadcastToSidePanel(message: Message): void {
-  sidePanelPort?.postMessage(message);
+  if (!sidePanelPort) {
+    console.warn('[KnowMe:SW] broadcastToSidePanel: port is NULL, msg type:', message.type);
+    return;
+  }
+  try {
+    sidePanelPort.postMessage(message);
+    console.log('[KnowMe:SW] broadcastToSidePanel sent:', message.type);
+  } catch (err) {
+    console.warn('[KnowMe:SW] broadcastToSidePanel FAILED:', message.type, err);
+    sidePanelPort = null;
+  }
 }
 
 // Open side panel when extension icon is clicked

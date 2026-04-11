@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import os
 import tempfile
 from pathlib import Path
 
@@ -20,9 +21,15 @@ class TribeRunner:
         """Load TRIBE v2 model. Called once at server startup."""
         from tribev2 import TribeModel
 
+        config_update = {}
+        num_workers = os.environ.get("KNOWME_NUM_WORKERS")
+        if num_workers is not None:
+            config_update["data.num_workers"] = int(num_workers)
+
         self.model = TribeModel.from_pretrained(
             "facebook/tribev2",
             cache_folder=self.cache_dir,
+            config_update=config_update or None,
         )
         self._loaded = True
 
@@ -162,9 +169,7 @@ class TribeRunner:
 
         Returns averaged vertex activations across all timesteps.
         """
-        from tribev2 import get_events_dataframe
-
-        events_df = get_events_dataframe(video_path=str(media_path))
+        events_df = self.model.get_events_dataframe(video_path=str(media_path))
         preds, segments = self.model.predict(events_df)
 
         # preds shape: (n_timesteps, n_vertices)
@@ -176,9 +181,7 @@ class TribeRunner:
         TRIBE v2 processes text by synthesizing speech (gTTS) then using
         Whisper for word timings before running through the audio encoder.
         """
-        from tribev2 import get_events_dataframe
-
-        events_df = get_events_dataframe(text_path=str(text_path))
+        events_df = self.model.get_events_dataframe(text_path=str(text_path))
         preds, segments = self.model.predict(events_df)
 
         return preds.mean(axis=0)
