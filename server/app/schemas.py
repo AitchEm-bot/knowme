@@ -27,6 +27,7 @@ class BrainAnalysisResponse(BaseModel):
     vertex_activations: list[float]  # 20,484 values
     summary: str
     engagement_scores: dict[str, float]
+    emotion_scores: dict[str, float]
     processing_time_ms: int
 
 

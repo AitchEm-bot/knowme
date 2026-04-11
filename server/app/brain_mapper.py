@@ -67,6 +67,89 @@ REGION_CATEGORIES: dict[str, dict] = {
     },
 }
 
+# Emotion predictions derived from weighted combinations of cognitive engagement scores.
+# Based on neuroscience literature mapping brain region activations to emotional states.
+EMOTION_MAPPINGS: dict[str, dict[str, float]] = {
+    "Joy": {
+        "Reward & Motivation": 0.4,
+        "Face Recognition": 0.25,
+        "Social & Emotional Processing": 0.2,
+        "Visual Processing": 0.15,
+    },
+    "Awe": {
+        "Visual Processing": 0.35,
+        "Attention & Spatial Awareness": 0.3,
+        "Scene & Place Processing": 0.2,
+        "Memory Encoding": 0.15,
+    },
+    "Empathy": {
+        "Social & Emotional Processing": 0.4,
+        "Face Recognition": 0.3,
+        "Emotional Regulation": 0.2,
+        "Language & Semantics": 0.1,
+    },
+    "Nostalgia": {
+        "Memory Encoding": 0.35,
+        "Emotional Regulation": 0.25,
+        "Scene & Place Processing": 0.2,
+        "Reward & Motivation": 0.2,
+    },
+    "Desire": {
+        "Reward & Motivation": 0.4,
+        "Attention & Spatial Awareness": 0.25,
+        "Visual Processing": 0.2,
+        "Body & Motion Processing": 0.15,
+    },
+    "Calm": {
+        "Emotional Regulation": 0.35,
+        "Scene & Place Processing": 0.3,
+        "Memory Encoding": 0.2,
+        "Visual Processing": 0.15,
+    },
+    "Excitement": {
+        "Attention & Spatial Awareness": 0.3,
+        "Reward & Motivation": 0.3,
+        "Body & Motion Processing": 0.2,
+        "Visual Processing": 0.2,
+    },
+    "Curiosity": {
+        "Attention & Spatial Awareness": 0.3,
+        "Language & Semantics": 0.25,
+        "Memory Encoding": 0.25,
+        "Visual Processing": 0.2,
+    },
+    "Tenderness": {
+        "Social & Emotional Processing": 0.35,
+        "Face Recognition": 0.3,
+        "Emotional Regulation": 0.2,
+        "Reward & Motivation": 0.15,
+    },
+    "Surprise": {
+        "Attention & Spatial Awareness": 0.35,
+        "Visual Processing": 0.25,
+        "Face Recognition": 0.2,
+        "Body & Motion Processing": 0.2,
+    },
+    "Melancholy": {
+        "Emotional Regulation": 0.3,
+        "Memory Encoding": 0.3,
+        "Language & Semantics": 0.2,
+        "Scene & Place Processing": 0.2,
+    },
+    "Inspiration": {
+        "Reward & Motivation": 0.3,
+        "Attention & Spatial Awareness": 0.25,
+        "Language & Semantics": 0.25,
+        "Visual Processing": 0.2,
+    },
+    "Humor": {
+        "Reward & Motivation": 0.3,
+        "Social & Emotional Processing": 0.25,
+        "Language & Semantics": 0.25,
+        "Face Recognition": 0.2,
+    },
+}
+
 # Human-readable full names for common Glasser regions
 REGION_FULL_NAMES: dict[str, str] = {
     "V1": "Primary Visual Cortex",
@@ -262,6 +345,29 @@ class BrainMapper:
                 f"This content engages {parts[0]}, {parts[1]}, "
                 f"and {parts[2]}."
             )
+
+    def get_emotion_scores(
+        self, engagement_scores: dict[str, float]
+    ) -> dict[str, float]:
+        """Predict emotional responses from cognitive engagement scores.
+
+        Uses neuroscience-informed weighted combinations of engagement
+        categories to estimate emotional state predictions.
+        Returns top 4 emotions scoring above 0.25.
+        """
+        scores: dict[str, float] = {}
+        for emotion, weights in EMOTION_MAPPINGS.items():
+            score = sum(
+                engagement_scores.get(category, 0.0) * weight
+                for category, weight in weights.items()
+            )
+            score = max(0.0, min(1.0, score))
+            if score >= 0.25:
+                scores[emotion] = round(score, 4)
+
+        # Return top 4 sorted by score descending
+        sorted_emotions = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        return dict(sorted_emotions[:4])
 
     def get_vertex_region_map(self) -> list[str]:
         """Return region name for each vertex (for Three.js mesh coloring)."""

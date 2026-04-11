@@ -90,6 +90,7 @@ async def analyze_post(request: AnalysisRequest):
     # Map to brain regions
     regions_data = brain_mapper.get_region_activations(vertex_activations)
     engagement_scores = brain_mapper.get_engagement_scores(vertex_activations)
+    emotion_scores = brain_mapper.get_emotion_scores(engagement_scores)
     summary = brain_mapper.generate_summary(engagement_scores)
 
     # Normalize vertex activations to 0-1 for the frontend
@@ -110,6 +111,7 @@ async def analyze_post(request: AnalysisRequest):
         vertex_activations=normalized,
         summary=summary,
         engagement_scores=engagement_scores,
+        emotion_scores=emotion_scores,
         processing_time_ms=elapsed_ms,
     )
 

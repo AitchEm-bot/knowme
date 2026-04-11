@@ -14,6 +14,23 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Body & Motion Processing': '#80cbc4',
 };
 
+// Color for each predicted emotion
+const EMOTION_COLORS: Record<string, string> = {
+  'Joy': '#ffd700',
+  'Awe': '#7c4dff',
+  'Empathy': '#ff6f91',
+  'Nostalgia': '#c2a878',
+  'Desire': '#ff4081',
+  'Calm': '#69f0ae',
+  'Excitement': '#ff9100',
+  'Curiosity': '#00e5ff',
+  'Tenderness': '#f8bbd0',
+  'Surprise': '#ffea00',
+  'Melancholy': '#78909c',
+  'Inspiration': '#e040fb',
+  'Humor': '#76ff03',
+};
+
 export class AnalysisPanel {
   private container: HTMLElement;
   private onRegionHover?: (regionName: string) => void;
@@ -36,6 +53,23 @@ export class AnalysisPanel {
     summary.textContent = result.summary;
     this.container.appendChild(summary);
 
+    // Emotion scores
+    const emotionEntries = Object.entries(result.emotion_scores || {})
+      .sort(([, a], [, b]) => b - a);
+
+    if (emotionEntries.length > 0) {
+      const emoSection = document.createElement('div');
+      emoSection.className = 'engagement-section';
+      const emoTitle = document.createElement('h3');
+      emoTitle.textContent = 'Predicted Emotional Response';
+      emoSection.appendChild(emoTitle);
+
+      for (const [label, score] of emotionEntries) {
+        emoSection.appendChild(this.createBar(label, score, EMOTION_COLORS));
+      }
+      this.container.appendChild(emoSection);
+    }
+
     // Engagement bars
     const engSection = document.createElement('div');
     engSection.className = 'engagement-section';
@@ -47,7 +81,7 @@ export class AnalysisPanel {
       .sort(([, a], [, b]) => b - a);
 
     for (const [label, score] of sortedScores) {
-      engSection.appendChild(this.createBar(label, score));
+      engSection.appendChild(this.createBar(label, score, CATEGORY_COLORS));
     }
     this.container.appendChild(engSection);
 
@@ -106,7 +140,7 @@ export class AnalysisPanel {
     this.container.innerHTML = '';
   }
 
-  private createBar(label: string, score: number): HTMLElement {
+  private createBar(label: string, score: number, colorMap: Record<string, string>): HTMLElement {
     const bar = document.createElement('div');
     bar.className = 'engagement-bar';
 
@@ -121,7 +155,7 @@ export class AnalysisPanel {
     fill.className = 'bar-fill';
     const pct = Math.round(score * 100);
     fill.style.width = `${pct}%`;
-    fill.style.background = CATEGORY_COLORS[label] || '#ff6f00';
+    fill.style.background = colorMap[label] || '#ff6f00';
     track.appendChild(fill);
 
     const value = document.createElement('span');

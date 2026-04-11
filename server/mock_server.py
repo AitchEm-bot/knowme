@@ -67,6 +67,13 @@ async def analyze(req: AnalysisRequest):
         "Emotional Regulation": round(random.uniform(0.1, 0.4), 4),
     }
 
+    emotion_scores = {
+        "Joy": round(random.uniform(0.3, 0.8), 4),
+        "Awe": round(random.uniform(0.2, 0.7), 4),
+        "Empathy": round(random.uniform(0.2, 0.6), 4),
+        "Excitement": round(random.uniform(0.3, 0.7), 4),
+    }
+
     print(f"[Mock] Analyzed post {req.post_id} | media_type={req.media_type} | has_url={bool(req.image_url or req.video_url)}")
 
     return {
@@ -76,6 +83,7 @@ async def analyze(req: AnalysisRequest):
         "vertex_activations": vertex_activations,
         "summary": "This content engages strong visual processing (72%), moderate face recognition (58%), and mild social cognition (34%).",
         "engagement_scores": engagement_scores,
+        "emotion_scores": emotion_scores,
         "processing_time_ms": random.randint(50, 200),
     }
 

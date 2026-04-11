@@ -27,6 +27,7 @@ export interface BrainAnalysisResponse {
   vertex_activations: number[]; // 20,484 values
   summary: string;
   engagement_scores: Record<string, number>;
+  emotion_scores: Record<string, number>;
   processing_time_ms: number;
 }
 

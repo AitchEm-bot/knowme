@@ -107,7 +107,7 @@ chrome.runtime.onConnect.addListener((port) => {
 // --- Message handling from content script ---
 
 chrome.runtime.onMessage.addListener(
-  (message: Message, _sender, _sendResponse) => {
+  (message: Message, _sender, sendResponse) => {
     if (message.type === 'POST_DETECTED') {
       const post = message.payload;
       const hasMedia = post.mediaUrl || post.mediaSrc;
@@ -125,8 +125,11 @@ chrome.runtime.onMessage.addListener(
         payload: { postId: post.postId, post },
       });
 
-      // Always attempt — don't gate on serverAvailable since it resets on SW restart
-      analyzePost(post);
+      // Return true to keep service worker alive until analysis completes.
+      // Chrome MV3 kills the SW 30s after event handlers return —
+      // this keeps the message channel (and the worker) alive.
+      analyzePost(post).then(() => sendResponse({ done: true }));
+      return true;
     }
     return false;
   }
