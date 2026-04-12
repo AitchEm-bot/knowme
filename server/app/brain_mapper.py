@@ -452,6 +452,16 @@ class BrainMapper:
 
         # Sort by activation descending
         results.sort(key=lambda r: r["activation"], reverse=True)
+
+        # Normalize activations to sum to 100% with a 1% floor
+        total = sum(r["activation"] for r in results)
+        if total > 0:
+            for r in results:
+                r["activation"] = max(r["activation"] / total, 0.01)
+            new_total = sum(r["activation"] for r in results)
+            for r in results:
+                r["activation"] = round(r["activation"] / new_total, 4)
+
         return results
 
     def get_engagement_scores(
@@ -481,11 +491,10 @@ class BrainMapper:
                             cat_activations.append(float(normalized[valid].mean()))
 
             if cat_activations:
-                scores[cat_info["label"]] = round(
-                    float(np.mean(cat_activations)), 4
-                )
+                scores[cat_info["label"]] = float(np.mean(cat_activations))
 
-        return scores
+        # Normalize so all scores sum to 100%, with a 1% floor
+        return self._normalize_to_100(scores)
 
     def generate_summary(self, engagement_scores: dict[str, float]) -> str:
         """Generate a human-readable summary from engagement scores."""
@@ -501,9 +510,9 @@ class BrainMapper:
 
         for label, score in top:
             pct = int(score * 100)
-            if pct >= 70:
+            if pct >= 15:
                 parts.append(f"strong {label.lower()} ({pct}%)")
-            elif pct >= 40:
+            elif pct >= 10:
                 parts.append(f"moderate {label.lower()} ({pct}%)")
             else:
                 parts.append(f"mild {label.lower()} ({pct}%)")
@@ -537,9 +546,37 @@ class BrainMapper:
             if score >= 0.25:
                 scores[emotion] = round(score, 4)
 
-        # Return top 4 sorted by score descending
+        # Top 10 emotions, then normalize so they sum to 100%
         sorted_emotions = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        return dict(sorted_emotions[:10])
+        top = dict(sorted_emotions[:10])
+        return self._normalize_to_100(top)
+
+    @staticmethod
+    def _normalize_to_100(scores: dict[str, float]) -> dict[str, float]:
+        """Normalize scores so they sum to 100%, with a 1% floor for near-zero values."""
+        if not scores:
+            return scores
+
+        total = sum(scores.values())
+        if total <= 0:
+            # All zero — distribute evenly
+            n = len(scores)
+            return {k: round(1.0 / n, 4) for k in scores}
+
+        # Scale so values sum to 1.0
+        normalized = {k: v / total for k, v in scores.items()}
+
+        # Apply 1% floor for near-zero values
+        floor = 0.01
+        floored: dict[str, float] = {}
+        for k, v in normalized.items():
+            floored[k] = max(v, floor)
+
+        # Re-normalize after flooring so they sum to exactly 1.0
+        new_total = sum(floored.values())
+        result = {k: round(v / new_total, 4) for k, v in floored.items()}
+
+        return result
 
     def get_vertex_region_map(self) -> list[str]:
         """Return region name for each vertex (for Three.js mesh coloring)."""
