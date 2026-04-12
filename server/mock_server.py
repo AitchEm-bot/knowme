@@ -59,19 +59,27 @@ async def analyze(req: AnalysisRequest):
     engagement_scores = {
         "Visual Processing": round(random.uniform(0.3, 0.9), 4),
         "Face Recognition": round(random.uniform(0.2, 0.8), 4),
+        "Scene & Place Processing": round(random.uniform(0.1, 0.6), 4),
         "Social & Emotional Processing": round(random.uniform(0.2, 0.7), 4),
         "Reward & Motivation": round(random.uniform(0.1, 0.6), 4),
         "Language & Semantics": round(random.uniform(0.1, 0.5), 4),
         "Attention & Spatial Awareness": round(random.uniform(0.2, 0.7), 4),
         "Memory Encoding": round(random.uniform(0.1, 0.5), 4),
         "Emotional Regulation": round(random.uniform(0.1, 0.4), 4),
+        "Body & Motion Processing": round(random.uniform(0.1, 0.5), 4),
     }
 
     emotion_scores = {
         "Joy": round(random.uniform(0.3, 0.8), 4),
         "Awe": round(random.uniform(0.2, 0.7), 4),
+        "Curiosity": round(random.uniform(0.3, 0.7), 4),
+        "Excitement": round(random.uniform(0.2, 0.6), 4),
         "Empathy": round(random.uniform(0.2, 0.6), 4),
-        "Excitement": round(random.uniform(0.3, 0.7), 4),
+        "Content": round(random.uniform(0.25, 0.65), 4),
+        "Surprise": round(random.uniform(0.25, 0.55), 4),
+        "Gratitude": round(random.uniform(0.25, 0.6), 4),
+        "Inspiration": round(random.uniform(0.3, 0.7), 4),
+        "Calm": round(random.uniform(0.2, 0.5), 4),
     }
 
     print(f"[Mock] Analyzed post {req.post_id} | media_type={req.media_type} | has_url={bool(req.image_url or req.video_url)}")

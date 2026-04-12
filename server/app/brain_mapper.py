@@ -69,84 +69,256 @@ REGION_CATEGORIES: dict[str, dict] = {
 
 # Emotion predictions derived from weighted combinations of cognitive engagement scores.
 # Based on neuroscience literature mapping brain region activations to emotional states.
+# Each emotion uses all 10 cognitive categories (weights sum to 1.0).
+# Organised by Feelings Wheel families: Happy, Surprise, Bad, Afraid, Angry, Disgust, Sad.
 EMOTION_MAPPINGS: dict[str, dict[str, float]] = {
+    # ── Happy family ─────────────────────────────────────────────────────
+    "Happy": {
+        "Visual Processing": 0.10, "Face Recognition": 0.15, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.20,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.08, "Memory Encoding": 0.05, "Emotional Regulation": 0.12, "Body & Motion Processing": 0.04,
+    },
     "Joy": {
-        "Reward & Motivation": 0.4,
-        "Face Recognition": 0.25,
-        "Social & Emotional Processing": 0.2,
-        "Visual Processing": 0.15,
+        "Visual Processing": 0.12, "Face Recognition": 0.15, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.22,
+        "Language & Semantics": 0.04, "Attention & Spatial Awareness": 0.08, "Memory Encoding": 0.04, "Emotional Regulation": 0.10, "Body & Motion Processing": 0.06,
     },
-    "Awe": {
-        "Visual Processing": 0.35,
-        "Attention & Spatial Awareness": 0.3,
-        "Scene & Place Processing": 0.2,
-        "Memory Encoding": 0.15,
+    "Playful": {
+        "Visual Processing": 0.10, "Face Recognition": 0.06, "Scene & Place Processing": 0.03, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.20,
+        "Language & Semantics": 0.04, "Attention & Spatial Awareness": 0.12, "Memory Encoding": 0.04, "Emotional Regulation": 0.08, "Body & Motion Processing": 0.18,
     },
-    "Empathy": {
-        "Social & Emotional Processing": 0.4,
-        "Face Recognition": 0.3,
-        "Emotional Regulation": 0.2,
-        "Language & Semantics": 0.1,
-    },
-    "Nostalgia": {
-        "Memory Encoding": 0.35,
-        "Emotional Regulation": 0.25,
-        "Scene & Place Processing": 0.2,
-        "Reward & Motivation": 0.2,
-    },
-    "Desire": {
-        "Reward & Motivation": 0.4,
-        "Attention & Spatial Awareness": 0.25,
-        "Visual Processing": 0.2,
-        "Body & Motion Processing": 0.15,
-    },
-    "Calm": {
-        "Emotional Regulation": 0.35,
-        "Scene & Place Processing": 0.3,
-        "Memory Encoding": 0.2,
-        "Visual Processing": 0.15,
-    },
-    "Excitement": {
-        "Attention & Spatial Awareness": 0.3,
-        "Reward & Motivation": 0.3,
-        "Body & Motion Processing": 0.2,
-        "Visual Processing": 0.2,
+    "Content": {
+        "Visual Processing": 0.08, "Face Recognition": 0.05, "Scene & Place Processing": 0.12, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.18,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.04, "Memory Encoding": 0.12, "Emotional Regulation": 0.20, "Body & Motion Processing": 0.05,
     },
     "Curiosity": {
-        "Attention & Spatial Awareness": 0.3,
-        "Language & Semantics": 0.25,
-        "Memory Encoding": 0.25,
-        "Visual Processing": 0.2,
+        "Visual Processing": 0.12, "Face Recognition": 0.04, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.06, "Reward & Motivation": 0.10,
+        "Language & Semantics": 0.18, "Attention & Spatial Awareness": 0.20, "Memory Encoding": 0.15, "Emotional Regulation": 0.08, "Body & Motion Processing": 0.03,
     },
-    "Tenderness": {
-        "Social & Emotional Processing": 0.35,
-        "Face Recognition": 0.3,
-        "Emotional Regulation": 0.2,
-        "Reward & Motivation": 0.15,
+    "Proud": {
+        "Visual Processing": 0.06, "Face Recognition": 0.10, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.18, "Reward & Motivation": 0.20,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.08, "Memory Encoding": 0.06, "Emotional Regulation": 0.12, "Body & Motion Processing": 0.04,
     },
-    "Surprise": {
-        "Attention & Spatial Awareness": 0.35,
-        "Visual Processing": 0.25,
-        "Face Recognition": 0.2,
-        "Body & Motion Processing": 0.2,
+    "Care": {
+        "Visual Processing": 0.08, "Face Recognition": 0.18, "Scene & Place Processing": 0.02, "Social & Emotional Processing": 0.22, "Reward & Motivation": 0.12,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.04, "Memory Encoding": 0.08, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.05,
     },
-    "Melancholy": {
-        "Emotional Regulation": 0.3,
-        "Memory Encoding": 0.3,
-        "Language & Semantics": 0.2,
-        "Scene & Place Processing": 0.2,
+    "Gratitude": {
+        "Visual Processing": 0.06, "Face Recognition": 0.10, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.18, "Reward & Motivation": 0.18,
+        "Language & Semantics": 0.08, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.12, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.03,
     },
     "Inspiration": {
-        "Reward & Motivation": 0.3,
-        "Attention & Spatial Awareness": 0.25,
-        "Language & Semantics": 0.25,
-        "Visual Processing": 0.2,
+        "Visual Processing": 0.12, "Face Recognition": 0.03, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.07, "Reward & Motivation": 0.20,
+        "Language & Semantics": 0.15, "Attention & Spatial Awareness": 0.15, "Memory Encoding": 0.08, "Emotional Regulation": 0.10, "Body & Motion Processing": 0.05,
+    },
+    "Arousal": {
+        "Visual Processing": 0.12, "Face Recognition": 0.05, "Scene & Place Processing": 0.03, "Social & Emotional Processing": 0.08, "Reward & Motivation": 0.15,
+        "Language & Semantics": 0.03, "Attention & Spatial Awareness": 0.18, "Memory Encoding": 0.04, "Emotional Regulation": 0.10, "Body & Motion Processing": 0.22,
+    },
+    "Confident": {
+        "Visual Processing": 0.07, "Face Recognition": 0.10, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.18,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.08, "Memory Encoding": 0.05, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.05,
+    },
+    "Powerful": {
+        "Visual Processing": 0.08, "Face Recognition": 0.04, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.18,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.15, "Memory Encoding": 0.05, "Emotional Regulation": 0.12, "Body & Motion Processing": 0.18,
+    },
+    "Creative": {
+        "Visual Processing": 0.18, "Face Recognition": 0.04, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.06, "Reward & Motivation": 0.12,
+        "Language & Semantics": 0.15, "Attention & Spatial Awareness": 0.18, "Memory Encoding": 0.10, "Emotional Regulation": 0.08, "Body & Motion Processing": 0.04,
+    },
+    "Trust": {
+        "Visual Processing": 0.06, "Face Recognition": 0.15, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.22, "Reward & Motivation": 0.12,
+        "Language & Semantics": 0.08, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.10, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.03,
+    },
+    "Tenderness": {
+        "Visual Processing": 0.08, "Face Recognition": 0.18, "Scene & Place Processing": 0.03, "Social & Emotional Processing": 0.22, "Reward & Motivation": 0.12,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.03, "Memory Encoding": 0.08, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.05,
+    },
+    # ── Surprise family ──────────────────────────────────────────────────
+    "Surprise": {
+        "Visual Processing": 0.15, "Face Recognition": 0.12, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.07, "Reward & Motivation": 0.06,
+        "Language & Semantics": 0.04, "Attention & Spatial Awareness": 0.22, "Memory Encoding": 0.08, "Emotional Regulation": 0.10, "Body & Motion Processing": 0.12,
+    },
+    "Excitement": {
+        "Visual Processing": 0.12, "Face Recognition": 0.05, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.08, "Reward & Motivation": 0.18,
+        "Language & Semantics": 0.05, "Attention & Spatial Awareness": 0.18, "Memory Encoding": 0.06, "Emotional Regulation": 0.08, "Body & Motion Processing": 0.15,
+    },
+    "Confusion": {
+        "Visual Processing": 0.10, "Face Recognition": 0.06, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.08, "Reward & Motivation": 0.03,
+        "Language & Semantics": 0.18, "Attention & Spatial Awareness": 0.20, "Memory Encoding": 0.12, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.04,
+    },
+    "Shock": {
+        "Visual Processing": 0.15, "Face Recognition": 0.06, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.08, "Reward & Motivation": 0.04,
+        "Language & Semantics": 0.04, "Attention & Spatial Awareness": 0.22, "Memory Encoding": 0.10, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.12,
+    },
+    "Eager": {
+        "Visual Processing": 0.10, "Face Recognition": 0.04, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.12, "Reward & Motivation": 0.20,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.18, "Memory Encoding": 0.06, "Emotional Regulation": 0.08, "Body & Motion Processing": 0.12,
+    },
+    "Awe": {
+        "Visual Processing": 0.20, "Face Recognition": 0.05, "Scene & Place Processing": 0.12, "Social & Emotional Processing": 0.06, "Reward & Motivation": 0.08,
+        "Language & Semantics": 0.05, "Attention & Spatial Awareness": 0.18, "Memory Encoding": 0.12, "Emotional Regulation": 0.10, "Body & Motion Processing": 0.04,
+    },
+    # ── Bad family ────────────────────────────────────────────────────────
+    "Stressed": {
+        "Visual Processing": 0.06, "Face Recognition": 0.04, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.08, "Reward & Motivation": 0.06,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.18, "Memory Encoding": 0.10, "Emotional Regulation": 0.22, "Body & Motion Processing": 0.12,
+    },
+    "Apathy": {
+        "Visual Processing": 0.08, "Face Recognition": 0.05, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.12, "Reward & Motivation": 0.10,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.06, "Memory Encoding": 0.15, "Emotional Regulation": 0.22, "Body & Motion Processing": 0.05,
+    },
+    "Overwhelmed": {
+        "Visual Processing": 0.06, "Face Recognition": 0.05, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.08, "Reward & Motivation": 0.05,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.18, "Memory Encoding": 0.12, "Emotional Regulation": 0.22, "Body & Motion Processing": 0.10,
+    },
+    "Boredom": {
+        "Visual Processing": 0.08, "Face Recognition": 0.05, "Scene & Place Processing": 0.06, "Social & Emotional Processing": 0.06, "Reward & Motivation": 0.10,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.12, "Memory Encoding": 0.18, "Emotional Regulation": 0.18, "Body & Motion Processing": 0.05,
+    },
+    "Helpless": {
+        "Visual Processing": 0.06, "Face Recognition": 0.05, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.08,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.06, "Memory Encoding": 0.12, "Emotional Regulation": 0.22, "Body & Motion Processing": 0.10,
+    },
+    # ── Afraid family ─────────────────────────────────────────────────────
+    "Afraid": {
+        "Visual Processing": 0.10, "Face Recognition": 0.05, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.08, "Reward & Motivation": 0.04,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.18, "Memory Encoding": 0.10, "Emotional Regulation": 0.20, "Body & Motion Processing": 0.15,
+    },
+    "Anxious": {
+        "Visual Processing": 0.06, "Face Recognition": 0.05, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.08, "Reward & Motivation": 0.05,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.15, "Memory Encoding": 0.10, "Emotional Regulation": 0.22, "Body & Motion Processing": 0.12,
+    },
+    "Insecure": {
+        "Visual Processing": 0.05, "Face Recognition": 0.15, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.18, "Reward & Motivation": 0.06,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.08, "Memory Encoding": 0.12, "Emotional Regulation": 0.18, "Body & Motion Processing": 0.04,
+    },
+    "Mistrust": {
+        "Visual Processing": 0.06, "Face Recognition": 0.12, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.22, "Reward & Motivation": 0.05,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.12, "Memory Encoding": 0.10, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.04,
+    },
+    "Worry": {
+        "Visual Processing": 0.08, "Face Recognition": 0.06, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.04,
+        "Language & Semantics": 0.18, "Attention & Spatial Awareness": 0.12, "Memory Encoding": 0.12, "Emotional Regulation": 0.20, "Body & Motion Processing": 0.06,
+    },
+    "Empty": {
+        "Visual Processing": 0.08, "Face Recognition": 0.05, "Scene & Place Processing": 0.06, "Social & Emotional Processing": 0.12, "Reward & Motivation": 0.10,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.18, "Emotional Regulation": 0.22, "Body & Motion Processing": 0.04,
+    },
+    "Embarrassment": {
+        "Visual Processing": 0.04, "Face Recognition": 0.18, "Scene & Place Processing": 0.03, "Social & Emotional Processing": 0.20, "Reward & Motivation": 0.04,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.08, "Memory Encoding": 0.06, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.12,
+    },
+    # ── Angry family ──────────────────────────────────────────────────────
+    "Angry": {
+        "Visual Processing": 0.04, "Face Recognition": 0.08, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.06,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.15, "Memory Encoding": 0.06, "Emotional Regulation": 0.20, "Body & Motion Processing": 0.12,
+    },
+    "Jealous": {
+        "Visual Processing": 0.05, "Face Recognition": 0.10, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.20, "Reward & Motivation": 0.15,
+        "Language & Semantics": 0.07, "Attention & Spatial Awareness": 0.12, "Memory Encoding": 0.08, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.04,
+    },
+    "Irritation": {
+        "Visual Processing": 0.08, "Face Recognition": 0.06, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.12, "Reward & Motivation": 0.05,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.18, "Memory Encoding": 0.05, "Emotional Regulation": 0.20, "Body & Motion Processing": 0.12,
+    },
+    "Frustration": {
+        "Visual Processing": 0.06, "Face Recognition": 0.05, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.12,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.15, "Memory Encoding": 0.06, "Emotional Regulation": 0.22, "Body & Motion Processing": 0.08,
+    },
+    "Bitter": {
+        "Visual Processing": 0.05, "Face Recognition": 0.06, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.10,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.08, "Memory Encoding": 0.15, "Emotional Regulation": 0.20, "Body & Motion Processing": 0.05,
+    },
+    "Shame": {
+        "Visual Processing": 0.05, "Face Recognition": 0.15, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.20, "Reward & Motivation": 0.04,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.06, "Memory Encoding": 0.12, "Emotional Regulation": 0.18, "Body & Motion Processing": 0.06,
+    },
+    "Withdrawn": {
+        "Visual Processing": 0.08, "Face Recognition": 0.05, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.10,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.06, "Memory Encoding": 0.15, "Emotional Regulation": 0.20, "Body & Motion Processing": 0.05,
+    },
+    "Numb": {
+        "Visual Processing": 0.10, "Face Recognition": 0.05, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.12, "Reward & Motivation": 0.05,
+        "Language & Semantics": 0.08, "Attention & Spatial Awareness": 0.06, "Memory Encoding": 0.12, "Emotional Regulation": 0.22, "Body & Motion Processing": 0.15,
+    },
+    # ── Disgust family ────────────────────────────────────────────────────
+    "Disgust": {
+        "Visual Processing": 0.15, "Face Recognition": 0.12, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.05,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.10, "Memory Encoding": 0.05, "Emotional Regulation": 0.18, "Body & Motion Processing": 0.15,
+    },
+    "Disdain": {
+        "Visual Processing": 0.06, "Face Recognition": 0.12, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.20, "Reward & Motivation": 0.05,
+        "Language & Semantics": 0.15, "Attention & Spatial Awareness": 0.10, "Memory Encoding": 0.08, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.05,
+    },
+    "Horror": {
+        "Visual Processing": 0.18, "Face Recognition": 0.06, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.08, "Reward & Motivation": 0.04,
+        "Language & Semantics": 0.05, "Attention & Spatial Awareness": 0.15, "Memory Encoding": 0.12, "Emotional Regulation": 0.18, "Body & Motion Processing": 0.10,
+    },
+    # ── Sad family ────────────────────────────────────────────────────────
+    "Sad": {
+        "Visual Processing": 0.08, "Face Recognition": 0.06, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.10,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.15, "Emotional Regulation": 0.20, "Body & Motion Processing": 0.04,
+    },
+    "Lonely": {
+        "Visual Processing": 0.06, "Face Recognition": 0.10, "Scene & Place Processing": 0.06, "Social & Emotional Processing": 0.22, "Reward & Motivation": 0.08,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.15, "Emotional Regulation": 0.12, "Body & Motion Processing": 0.04,
+    },
+    "Vulnerable": {
+        "Visual Processing": 0.05, "Face Recognition": 0.10, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.05,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.08, "Memory Encoding": 0.12, "Emotional Regulation": 0.20, "Body & Motion Processing": 0.15,
+    },
+    "Guilty": {
+        "Visual Processing": 0.05, "Face Recognition": 0.10, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.18, "Reward & Motivation": 0.08,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.06, "Memory Encoding": 0.12, "Emotional Regulation": 0.20, "Body & Motion Processing": 0.05,
+    },
+    "Depression": {
+        "Visual Processing": 0.08, "Face Recognition": 0.06, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.12, "Reward & Motivation": 0.12,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.15, "Emotional Regulation": 0.22, "Body & Motion Processing": 0.06,
+    },
+    "Hurt": {
+        "Visual Processing": 0.06, "Face Recognition": 0.10, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.18, "Reward & Motivation": 0.06,
+        "Language & Semantics": 0.08, "Attention & Spatial Awareness": 0.06, "Memory Encoding": 0.12, "Emotional Regulation": 0.18, "Body & Motion Processing": 0.12,
+    },
+    "Disappointment": {
+        "Visual Processing": 0.06, "Face Recognition": 0.06, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.12, "Reward & Motivation": 0.18,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.08, "Memory Encoding": 0.12, "Emotional Regulation": 0.18, "Body & Motion Processing": 0.05,
+    },
+    "Longing": {
+        "Visual Processing": 0.06, "Face Recognition": 0.05, "Scene & Place Processing": 0.12, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.15,
+        "Language & Semantics": 0.08, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.22, "Emotional Regulation": 0.12, "Body & Motion Processing": 0.05,
+    },
+    "Grief": {
+        "Visual Processing": 0.06, "Face Recognition": 0.10, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.12, "Reward & Motivation": 0.08,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.20, "Emotional Regulation": 0.18, "Body & Motion Processing": 0.05,
+    },
+    "Regret": {
+        "Visual Processing": 0.06, "Face Recognition": 0.05, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.12,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.08, "Memory Encoding": 0.20, "Emotional Regulation": 0.18, "Body & Motion Processing": 0.05,
+    },
+    # ── Extra (not on wheel, kept from original set) ──────────────────────
+    "Empathy": {
+        "Visual Processing": 0.08, "Face Recognition": 0.18, "Scene & Place Processing": 0.04, "Social & Emotional Processing": 0.22, "Reward & Motivation": 0.05,
+        "Language & Semantics": 0.10, "Attention & Spatial Awareness": 0.06, "Memory Encoding": 0.10, "Emotional Regulation": 0.12, "Body & Motion Processing": 0.05,
+    },
+    "Nostalgia": {
+        "Visual Processing": 0.08, "Face Recognition": 0.05, "Scene & Place Processing": 0.12, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.12,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.22, "Emotional Regulation": 0.15, "Body & Motion Processing": 0.05,
+    },
+    "Desire": {
+        "Visual Processing": 0.12, "Face Recognition": 0.06, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.22,
+        "Language & Semantics": 0.05, "Attention & Spatial Awareness": 0.15, "Memory Encoding": 0.05, "Emotional Regulation": 0.08, "Body & Motion Processing": 0.12,
+    },
+    "Calm": {
+        "Visual Processing": 0.12, "Face Recognition": 0.05, "Scene & Place Processing": 0.15, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.08,
+        "Language & Semantics": 0.06, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.12, "Emotional Regulation": 0.22, "Body & Motion Processing": 0.05,
+    },
+    "Melancholy": {
+        "Visual Processing": 0.08, "Face Recognition": 0.06, "Scene & Place Processing": 0.12, "Social & Emotional Processing": 0.10, "Reward & Motivation": 0.06,
+        "Language & Semantics": 0.12, "Attention & Spatial Awareness": 0.05, "Memory Encoding": 0.18, "Emotional Regulation": 0.18, "Body & Motion Processing": 0.05,
     },
     "Humor": {
-        "Reward & Motivation": 0.3,
-        "Social & Emotional Processing": 0.25,
-        "Language & Semantics": 0.25,
-        "Face Recognition": 0.2,
+        "Visual Processing": 0.06, "Face Recognition": 0.12, "Scene & Place Processing": 0.05, "Social & Emotional Processing": 0.15, "Reward & Motivation": 0.18,
+        "Language & Semantics": 0.15, "Attention & Spatial Awareness": 0.10, "Memory Encoding": 0.05, "Emotional Regulation": 0.08, "Body & Motion Processing": 0.06,
     },
 }
 
@@ -367,7 +539,7 @@ class BrainMapper:
 
         # Return top 4 sorted by score descending
         sorted_emotions = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        return dict(sorted_emotions[:4])
+        return dict(sorted_emotions[:10])
 
     def get_vertex_region_map(self) -> list[str]:
         """Return region name for each vertex (for Three.js mesh coloring)."""

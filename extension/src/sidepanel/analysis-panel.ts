@@ -9,31 +9,89 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Reward & Motivation': '#ffd54f',
   'Language & Semantics': '#90caf9',
   'Attention & Spatial Awareness': '#ef5350',
-  'Memory Encoding': '#a1887f',
+  'Memory Encoding': '#ffab40',
   'Emotional Regulation': '#f48fb1',
   'Body & Motion Processing': '#80cbc4',
 };
 
-// Color for each predicted emotion
+// Color for each predicted emotion — organised by Feelings Wheel family
 const EMOTION_COLORS: Record<string, string> = {
-  'Joy': '#ffd700',
+  // Happy family
+  'Happy': '#ffd700',
+  'Joy': '#ffeb3b',
+  'Playful': '#c6ff00',
+  'Content': '#8bc34a',
+  'Curiosity': '#00e5ff',
+  'Proud': '#ffc107',
+  'Care': '#f48fb1',
+  'Gratitude': '#ce93d8',
+  'Inspiration': '#e040fb',
+  'Arousal': '#ff6e40',
+  'Confident': '#ffab40',
+  'Powerful': '#ff9e80',
+  'Creative': '#b388ff',
+  'Trust': '#26a69a',
+  'Tenderness': '#f8bbd0',
+  // Surprise family
+  'Surprise': '#ffea00',
+  'Excitement': '#ff9100',
+  'Confusion': '#b0bec5',
+  'Shock': '#ff1744',
+  'Eager': '#ffab00',
   'Awe': '#7c4dff',
+  // Bad family
+  'Stressed': '#ef5350',
+  'Apathy': '#78909c',
+  'Overwhelmed': '#d84315',
+  'Boredom': '#90a4ae',
+  'Helpless': '#8d6e63',
+  // Afraid family
+  'Afraid': '#ff7043',
+  'Anxious': '#ffab91',
+  'Insecure': '#bcaaa4',
+  'Mistrust': '#a1887f',
+  'Worry': '#ffcc80',
+  'Empty': '#546e7a',
+  'Embarrassment': '#f06292',
+  // Angry family
+  'Angry': '#f44336',
+  'Jealous': '#e91e63',
+  'Irritation': '#ff5252',
+  'Frustration': '#d32f2f',
+  'Bitter': '#795548',
+  'Shame': '#ad1457',
+  'Withdrawn': '#607d8b',
+  'Numb': '#455a64',
+  // Disgust family
+  'Disgust': '#9c27b0',
+  'Disdain': '#6a1b9a',
+  'Horror': '#1a237e',
+  // Sad family
+  'Sad': '#42a5f5',
+  'Lonely': '#5c6bc0',
+  'Vulnerable': '#ab47bc',
+  'Guilty': '#7e57c2',
+  'Depression': '#37474f',
+  'Hurt': '#ec407a',
+  'Disappointment': '#6d4c41',
+  'Longing': '#d4a574',
+  'Grief': '#3949ab',
+  'Regret': '#5e35b1',
+  // Extra (not on wheel)
   'Empathy': '#ff6f91',
   'Nostalgia': '#c2a878',
   'Desire': '#ff4081',
   'Calm': '#69f0ae',
-  'Excitement': '#ff9100',
-  'Curiosity': '#00e5ff',
-  'Tenderness': '#f8bbd0',
-  'Surprise': '#ffea00',
-  'Melancholy': '#78909c',
-  'Inspiration': '#e040fb',
+  'Melancholy': '#6b7b8d',
   'Humor': '#76ff03',
 };
 
 export class AnalysisPanel {
   private container: HTMLElement;
   private onRegionHover?: (regionName: string) => void;
+  private onBarClick?: (type: 'emotion' | 'engagement', label: string, color: string) => void;
+  private onRegionClick?: (categoryKey: string, color: string) => void;
+  private selectedBarEl: HTMLElement | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -43,9 +101,34 @@ export class AnalysisPanel {
     this.onRegionHover = cb;
   }
 
+  setBarClickCallback(cb: (type: 'emotion' | 'engagement', label: string, color: string) => void): void {
+    this.onBarClick = cb;
+  }
+
+  setRegionClickCallback(cb: (categoryKey: string, color: string) => void): void {
+    this.onRegionClick = cb;
+  }
+
+  clearSelection(): void {
+    if (this.selectedBarEl) {
+      this.selectedBarEl.classList.remove('selected');
+      this.selectedBarEl = null;
+    }
+  }
+
   showAnalysis(result: BrainAnalysisResult): void {
     this.container.innerHTML = '';
     this.container.classList.remove('hidden');
+    this.selectedBarEl = null;
+
+    // Clear highlight when user scrolls the analysis panel
+    this.container.onscroll = () => {
+      if (this.selectedBarEl) {
+        this.selectedBarEl.classList.remove('selected');
+        this.selectedBarEl = null;
+        this.onBarClick?.('engagement', '', '');
+      }
+    };
 
     // Summary
     const summary = document.createElement('div');
@@ -65,7 +148,7 @@ export class AnalysisPanel {
       emoSection.appendChild(emoTitle);
 
       for (const [label, score] of emotionEntries) {
-        emoSection.appendChild(this.createBar(label, score, EMOTION_COLORS));
+        emoSection.appendChild(this.createBar(label, score, EMOTION_COLORS, 'emotion'));
       }
       this.container.appendChild(emoSection);
     }
@@ -81,7 +164,7 @@ export class AnalysisPanel {
       .sort(([, a], [, b]) => b - a);
 
     for (const [label, score] of sortedScores) {
-      engSection.appendChild(this.createBar(label, score, CATEGORY_COLORS));
+      engSection.appendChild(this.createBar(label, score, CATEGORY_COLORS, 'engagement'));
     }
     this.container.appendChild(engSection);
 
@@ -140,9 +223,25 @@ export class AnalysisPanel {
     this.container.innerHTML = '';
   }
 
-  private createBar(label: string, score: number, colorMap: Record<string, string>): HTMLElement {
+  private createBar(label: string, score: number, colorMap: Record<string, string>, type: 'emotion' | 'engagement' = 'engagement'): HTMLElement {
     const bar = document.createElement('div');
-    bar.className = 'engagement-bar';
+    bar.className = 'engagement-bar clickable';
+    const barColor = colorMap[label] || '#ff6f00';
+
+    bar.addEventListener('click', () => {
+      const isSelected = this.selectedBarEl === bar;
+      if (this.selectedBarEl) {
+        this.selectedBarEl.classList.remove('selected');
+      }
+      if (isSelected) {
+        this.selectedBarEl = null;
+        this.onBarClick?.(type, '', '');
+      } else {
+        bar.classList.add('selected');
+        this.selectedBarEl = bar;
+        this.onBarClick?.(type, label, barColor);
+      }
+    });
 
     const labelEl = document.createElement('span');
     labelEl.className = 'label';
@@ -191,6 +290,10 @@ export class AnalysisPanel {
 
     item.addEventListener('mouseenter', () => {
       this.onRegionHover?.(region.region_name);
+    });
+
+    item.addEventListener('click', () => {
+      this.onRegionClick?.(region.category, catColor);
     });
 
     return item;

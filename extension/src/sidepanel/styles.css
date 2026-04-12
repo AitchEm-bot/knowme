@@ -121,6 +121,24 @@ body {
   margin-bottom: 6px;
 }
 
+.engagement-bar.clickable {
+  cursor: pointer;
+  padding: 4px 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.engagement-bar.clickable:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.engagement-bar.selected {
+  background: rgba(255, 255, 255, 0.08);
+  outline: 1px solid rgba(255, 255, 255, 0.15);
+}
+
 .engagement-bar .label {
   font-size: 12px;
   width: 140px;

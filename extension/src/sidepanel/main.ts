@@ -1,12 +1,84 @@
 import type { Message } from '../lib/messages';
 import type { BrainAnalysisResult, ServerStatus } from '../lib/types';
 import { db } from '../lib/database';
-import { BrainRenderer } from './brain-renderer';
+import { BrainRenderer, LABEL_TO_REGION_KEY } from './brain-renderer';
 import { AnalysisPanel } from './analysis-panel';
 import { HistoryPanel } from './history-panel';
 import { SetupGuide } from './setup-guide';
 
 const BRAIN_MODEL_URL = chrome.runtime.getURL('assets/brain.glb');
+
+// Top 3 brain categories contributing to each emotion (for highlight on click)
+const EMOTION_TOP_CATEGORIES: Record<string, string[]> = {
+  // Happy family
+  'Happy': ['Reward & Motivation', 'Social & Emotional Processing', 'Face Recognition'],
+  'Joy': ['Reward & Motivation', 'Social & Emotional Processing', 'Face Recognition'],
+  'Playful': ['Reward & Motivation', 'Body & Motion Processing', 'Social & Emotional Processing'],
+  'Content': ['Emotional Regulation', 'Reward & Motivation', 'Scene & Place Processing'],
+  'Curiosity': ['Attention & Spatial Awareness', 'Language & Semantics', 'Memory Encoding'],
+  'Proud': ['Reward & Motivation', 'Social & Emotional Processing', 'Language & Semantics'],
+  'Care': ['Social & Emotional Processing', 'Face Recognition', 'Emotional Regulation'],
+  'Gratitude': ['Reward & Motivation', 'Social & Emotional Processing', 'Emotional Regulation'],
+  'Inspiration': ['Reward & Motivation', 'Language & Semantics', 'Attention & Spatial Awareness'],
+  'Arousal': ['Body & Motion Processing', 'Attention & Spatial Awareness', 'Reward & Motivation'],
+  'Confident': ['Reward & Motivation', 'Social & Emotional Processing', 'Emotional Regulation'],
+  'Powerful': ['Reward & Motivation', 'Body & Motion Processing', 'Attention & Spatial Awareness'],
+  'Creative': ['Visual Processing', 'Attention & Spatial Awareness', 'Language & Semantics'],
+  'Trust': ['Social & Emotional Processing', 'Face Recognition', 'Emotional Regulation'],
+  'Tenderness': ['Social & Emotional Processing', 'Face Recognition', 'Emotional Regulation'],
+  // Surprise family
+  'Surprise': ['Attention & Spatial Awareness', 'Visual Processing', 'Face Recognition'],
+  'Excitement': ['Attention & Spatial Awareness', 'Reward & Motivation', 'Body & Motion Processing'],
+  'Confusion': ['Attention & Spatial Awareness', 'Language & Semantics', 'Emotional Regulation'],
+  'Shock': ['Attention & Spatial Awareness', 'Visual Processing', 'Emotional Regulation'],
+  'Eager': ['Reward & Motivation', 'Attention & Spatial Awareness', 'Social & Emotional Processing'],
+  'Awe': ['Visual Processing', 'Attention & Spatial Awareness', 'Scene & Place Processing'],
+  // Bad family
+  'Stressed': ['Emotional Regulation', 'Attention & Spatial Awareness', 'Body & Motion Processing'],
+  'Apathy': ['Emotional Regulation', 'Memory Encoding', 'Social & Emotional Processing'],
+  'Overwhelmed': ['Emotional Regulation', 'Attention & Spatial Awareness', 'Memory Encoding'],
+  'Boredom': ['Memory Encoding', 'Emotional Regulation', 'Attention & Spatial Awareness'],
+  'Helpless': ['Emotional Regulation', 'Social & Emotional Processing', 'Memory Encoding'],
+  // Afraid family
+  'Afraid': ['Emotional Regulation', 'Attention & Spatial Awareness', 'Body & Motion Processing'],
+  'Anxious': ['Emotional Regulation', 'Attention & Spatial Awareness', 'Language & Semantics'],
+  'Insecure': ['Social & Emotional Processing', 'Emotional Regulation', 'Face Recognition'],
+  'Mistrust': ['Social & Emotional Processing', 'Emotional Regulation', 'Face Recognition'],
+  'Worry': ['Emotional Regulation', 'Language & Semantics', 'Attention & Spatial Awareness'],
+  'Empty': ['Emotional Regulation', 'Memory Encoding', 'Social & Emotional Processing'],
+  'Embarrassment': ['Social & Emotional Processing', 'Face Recognition', 'Emotional Regulation'],
+  // Angry family
+  'Angry': ['Emotional Regulation', 'Social & Emotional Processing', 'Attention & Spatial Awareness'],
+  'Jealous': ['Social & Emotional Processing', 'Reward & Motivation', 'Emotional Regulation'],
+  'Irritation': ['Emotional Regulation', 'Attention & Spatial Awareness', 'Social & Emotional Processing'],
+  'Frustration': ['Emotional Regulation', 'Attention & Spatial Awareness', 'Reward & Motivation'],
+  'Bitter': ['Emotional Regulation', 'Social & Emotional Processing', 'Memory Encoding'],
+  'Shame': ['Social & Emotional Processing', 'Emotional Regulation', 'Face Recognition'],
+  'Withdrawn': ['Emotional Regulation', 'Social & Emotional Processing', 'Memory Encoding'],
+  'Numb': ['Emotional Regulation', 'Body & Motion Processing', 'Social & Emotional Processing'],
+  // Disgust family
+  'Disgust': ['Emotional Regulation', 'Visual Processing', 'Body & Motion Processing'],
+  'Disdain': ['Social & Emotional Processing', 'Language & Semantics', 'Emotional Regulation'],
+  'Horror': ['Visual Processing', 'Emotional Regulation', 'Attention & Spatial Awareness'],
+  // Sad family
+  'Sad': ['Emotional Regulation', 'Social & Emotional Processing', 'Memory Encoding'],
+  'Lonely': ['Social & Emotional Processing', 'Memory Encoding', 'Emotional Regulation'],
+  'Vulnerable': ['Emotional Regulation', 'Social & Emotional Processing', 'Body & Motion Processing'],
+  'Guilty': ['Emotional Regulation', 'Social & Emotional Processing', 'Memory Encoding'],
+  'Depression': ['Emotional Regulation', 'Memory Encoding', 'Social & Emotional Processing'],
+  'Hurt': ['Social & Emotional Processing', 'Emotional Regulation', 'Body & Motion Processing'],
+  'Disappointment': ['Reward & Motivation', 'Emotional Regulation', 'Social & Emotional Processing'],
+  'Longing': ['Memory Encoding', 'Reward & Motivation', 'Scene & Place Processing'],
+  'Grief': ['Memory Encoding', 'Emotional Regulation', 'Social & Emotional Processing'],
+  'Regret': ['Memory Encoding', 'Emotional Regulation', 'Language & Semantics'],
+  // Extra
+  'Empathy': ['Social & Emotional Processing', 'Face Recognition', 'Emotional Regulation'],
+  'Nostalgia': ['Memory Encoding', 'Emotional Regulation', 'Scene & Place Processing'],
+  'Desire': ['Reward & Motivation', 'Attention & Spatial Awareness', 'Visual Processing'],
+  'Calm': ['Emotional Regulation', 'Scene & Place Processing', 'Visual Processing'],
+  'Melancholy': ['Memory Encoding', 'Emotional Regulation', 'Scene & Place Processing'],
+  'Humor': ['Reward & Motivation', 'Social & Emotional Processing', 'Language & Semantics'],
+};
 
 class SidePanelApp {
   private renderer!: BrainRenderer;
@@ -29,6 +101,32 @@ class SidePanelApp {
     this.setupGuide = new SetupGuide(document.getElementById('analysis-panel')!);
 
     this.historyPanel.setSelectCallback((result) => this.showAnalysis(result));
+    this.analysisPanel.setBarClickCallback((type, label, color) => {
+      if (!label) {
+        this.renderer.clearHighlight();
+        return;
+      }
+      const colorHex = parseInt(color.replace('#', ''), 16);
+      if (type === 'engagement') {
+        const key = LABEL_TO_REGION_KEY[label];
+        if (key) {
+          this.renderer.highlightCategory([key], colorHex);
+          this.renderer.focusOnRegion(key);
+        }
+      } else {
+        const topCats = EMOTION_TOP_CATEGORIES[label] || [];
+        const keys = topCats.map(c => LABEL_TO_REGION_KEY[c]).filter(Boolean) as string[];
+        if (keys.length) {
+          this.renderer.highlightCategory(keys, colorHex);
+          this.renderer.focusOnRegion(keys[0]);
+        }
+      }
+    });
+    this.analysisPanel.setRegionClickCallback((categoryKey, color) => {
+      const colorHex = parseInt(color.replace('#', ''), 16);
+      this.renderer.highlightCategory([categoryKey], colorHex);
+      this.renderer.focusOnRegion(categoryKey);
+    });
     this.setupGuide.setConnectedCallback(() => {
       this.setupGuide.hide();
     });

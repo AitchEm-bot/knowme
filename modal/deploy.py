@@ -48,6 +48,7 @@ app = modal.App("knowme", image=image)
 @app.function(
     gpu="A100",
     volumes={"/cache": volume},
+    secrets=[modal.Secret.from_name("huggingface")],
     scaledown_window=300,        # keep warm for 5 min after last request
     timeout=600,                 # allow up to 10 min per request (first-run model download)
     max_containers=1,            # only one A100 container at a time
