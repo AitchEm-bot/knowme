@@ -309,3 +309,4 @@ See [LICENSE](LICENSE) for full text.
 - [HCP Glasser Atlas](https://doi.org/10.1038/nature18933) for brain parcellation (Glasser et al., 2016)
 - [fsaverage5](https://surfer.nmr.mgh.harvard.edu/) cortical surface mesh (FreeSurfer)
 - [Feelings Wheel](https://feelingswheel.com/) emotion taxonomy (Gloria Willcox)
+- ["Neural Networks of the Brain"](https://skfb.ly/oq8Bs) 3D brain model by Universal Design for Learning, licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/)
