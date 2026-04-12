@@ -147,9 +147,8 @@ export class AnalysisPanel {
       emoTitle.textContent = 'Predicted Emotional Response';
       emoSection.appendChild(emoTitle);
 
-      const emoMax = emotionEntries.length > 0 ? emotionEntries[0][1] : 1;
       for (const [label, score] of emotionEntries) {
-        emoSection.appendChild(this.createBar(label, score, EMOTION_COLORS, 'emotion', emoMax));
+        emoSection.appendChild(this.createBar(label, score, EMOTION_COLORS, 'emotion'));
       }
       this.container.appendChild(emoSection);
     }
@@ -164,24 +163,17 @@ export class AnalysisPanel {
     const sortedScores = Object.entries(result.engagement_scores)
       .sort(([, a], [, b]) => b - a);
 
-    const engMax = sortedScores.length > 0 ? sortedScores[0][1] : 1;
     for (const [label, score] of sortedScores) {
-      engSection.appendChild(this.createBar(label, score, CATEGORY_COLORS, 'engagement', engMax));
+      engSection.appendChild(this.createBar(label, score, CATEGORY_COLORS, 'engagement'));
     }
     this.container.appendChild(engSection);
 
-    // Top regions — re-normalize the visible subset so they sum to 100%
+    // Top regions
     const topRegions = result.regions
       .sort((a, b) => b.activation - a.activation)
       .slice(0, 8);
 
     if (topRegions.length > 0) {
-      const regTotal = topRegions.reduce((s, r) => s + r.activation, 0);
-      const normalizedRegions = topRegions.map(r => ({
-        ...r,
-        activation: regTotal > 0 ? r.activation / regTotal : 0,
-      }));
-
       const regSection = document.createElement('div');
       regSection.className = 'engagement-section';
       const regTitle = document.createElement('h3');
@@ -190,7 +182,7 @@ export class AnalysisPanel {
 
       const list = document.createElement('ul');
       list.className = 'region-list';
-      for (const region of normalizedRegions) {
+      for (const region of topRegions) {
         list.appendChild(this.createRegionItem(region));
       }
       regSection.appendChild(list);
@@ -231,7 +223,7 @@ export class AnalysisPanel {
     this.container.innerHTML = '';
   }
 
-  private createBar(label: string, score: number, colorMap: Record<string, string>, type: 'emotion' | 'engagement' = 'engagement', maxScore = 1): HTMLElement {
+  private createBar(label: string, score: number, colorMap: Record<string, string>, type: 'emotion' | 'engagement' = 'engagement'): HTMLElement {
     const bar = document.createElement('div');
     bar.className = 'engagement-bar clickable';
     const barColor = colorMap[label] || '#ff6f00';
@@ -261,9 +253,7 @@ export class AnalysisPanel {
     const fill = document.createElement('div');
     fill.className = 'bar-fill';
     const pct = Math.round(score * 100);
-    // Scale bar width relative to the highest score so top bar fills the track
-    const barWidth = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
-    fill.style.width = `${barWidth}%`;
+    fill.style.width = `${pct}%`;
     fill.style.background = colorMap[label] || '#ff6f00';
     track.appendChild(fill);
 

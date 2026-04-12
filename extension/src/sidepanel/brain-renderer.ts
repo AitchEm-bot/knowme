@@ -259,19 +259,10 @@ export class BrainRenderer {
     this.highlightActive = false;
     this.highlightedRegions.clear();
 
-    // Map labels to region keys and scale relative to max so top category drives full brightness
-    const raw: Record<string, number> = {};
-    let maxVal = 0;
+    const scores: Record<string, number> = {};
     for (const [label, value] of Object.entries(engagementScores)) {
       const key = LABEL_TO_REGION_KEY[label];
-      if (key) {
-        raw[key] = value;
-        if (value > maxVal) maxVal = value;
-      }
-    }
-    const scores: Record<string, number> = {};
-    for (const [key, value] of Object.entries(raw)) {
-      scores[key] = maxVal > 0 ? value / maxVal : 0;
+      if (key) scores[key] = value;
     }
 
     for (let m = 0; m < this.meshes.length; m++) {
