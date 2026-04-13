@@ -42,23 +42,38 @@ export class SetupGuide {
             <div class="step">
               <span class="step-num">1</span>
               <div>
-                <strong>Install Modal</strong>
-                <code>pip install modal && modal setup</code>
+                <strong>Get a HuggingFace token</strong>
+                <p class="note">Accept the license at <strong>huggingface.co/meta-llama/Llama-3.2-3B</strong>, then create a read token at <strong>huggingface.co/settings/tokens</strong>.</p>
               </div>
             </div>
             <div class="step">
               <span class="step-num">2</span>
               <div>
-                <strong>Deploy the server</strong>
-                <code>cd knowme && modal deploy modal/app.py</code>
-                <p class="note">First deploy builds the container image (~10 min). Model weights are cached for future runs.</p>
+                <strong>Install Modal</strong>
+                <code>pip install modal && modal setup</code>
               </div>
             </div>
             <div class="step">
               <span class="step-num">3</span>
               <div>
+                <strong>Store the HF token as a Modal secret</strong>
+                <code>modal secret create huggingface HF_TOKEN=hf_your_token</code>
+                <p class="note">The secret name must be exactly <strong>huggingface</strong>.</p>
+              </div>
+            </div>
+            <div class="step">
+              <span class="step-num">4</span>
+              <div>
+                <strong>Deploy the server</strong>
+                <code>modal deploy modal/deploy.py</code>
+                <p class="note">Run from the repo root. First deploy builds the container image (~10 min); model weights are cached for future runs.</p>
+              </div>
+            </div>
+            <div class="step">
+              <span class="step-num">5</span>
+              <div>
                 <strong>Copy your endpoint URL</strong>
-                <p class="note">Modal prints the URL after deploy. Paste it in the field above.</p>
+                <p class="note">Modal prints a <strong>https://…modal.run</strong> URL after deploy. Paste it in the field above.</p>
               </div>
             </div>
           </div>
@@ -67,16 +82,38 @@ export class SetupGuide {
         <details class="setup-option">
           <summary>Run locally</summary>
           <div class="setup-option-body">
-            <p class="note">Requires Python 3.11+, NVIDIA GPU (A100/H100), ~15 GB disk.</p>
+            <p class="note">Requires Python 3.11+, NVIDIA GPU (A100 recommended), <strong>ffmpeg</strong> on PATH, ~15 GB disk.</p>
             <div class="step">
               <span class="step-num">1</span>
               <div>
-                <strong>Install &amp; start</strong>
-                <code>cd knowme/server<br>pip install -r requirements.txt<br>uvicorn app.main:app --host 0.0.0.0 --port 8000</code>
+                <strong>Get a HuggingFace token</strong>
+                <p class="note">Accept the license at <strong>huggingface.co/meta-llama/Llama-3.2-3B</strong>, then create a read token at <strong>huggingface.co/settings/tokens</strong>.</p>
               </div>
             </div>
             <div class="step">
               <span class="step-num">2</span>
+              <div>
+                <strong>Export the token</strong>
+                <code>export HF_TOKEN=hf_your_token      # Linux/macOS<br>set HF_TOKEN=hf_your_token         # Windows CMD<br>$env:HF_TOKEN = "hf_your_token"    # PowerShell</code>
+              </div>
+            </div>
+            <div class="step">
+              <span class="step-num">3</span>
+              <div>
+                <strong>Install dependencies in a venv</strong>
+                <code>cd server<br>python -m venv .venv<br>source .venv/bin/activate      # Linux/macOS<br>.venv\Scripts\activate         # Windows<br>pip install -r requirements.txt</code>
+              </div>
+            </div>
+            <div class="step">
+              <span class="step-num">4</span>
+              <div>
+                <strong>Start the server</strong>
+                <code>uvicorn app.main:app --host 0.0.0.0 --port 8000</code>
+                <p class="note">First run downloads ~15 GB of weights.</p>
+              </div>
+            </div>
+            <div class="step">
+              <span class="step-num">5</span>
               <div>
                 <strong>Connect</strong>
                 <p class="note">Enter <strong>http://localhost:8000</strong> in the URL field above.</p>
