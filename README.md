@@ -25,9 +25,11 @@ KnowMe scans your feed, predicts which brain regions would activate in response 
 
 ## Setup
 
-### Option A: Local Server (requires NVIDIA GPU)
+The extension is the same regardless of where the inference server runs. Do Part 1 and Part 2 once, then pick **one** backend in Part 3, then wire them together in Part 4.
 
-#### 1. Build the extension
+### Part 1 — Build the extension (always required)
+
+From the repo root:
 
 ```bash
 cd extension
@@ -35,102 +37,105 @@ npm install
 npm run build
 ```
 
-#### 2. Load the extension in Chrome
+This writes the built extension to `extension/dist/`.
 
-1. Go to `chrome://extensions`
-2. Enable **Developer Mode** (top right toggle)
-3. Click **Load unpacked** and select the `extension/dist` folder
-4. Pin the KnowMe extension in the toolbar
+### Part 2 — Load the extension in Chrome (always required)
 
-#### 3. Set up HuggingFace access
+1. Open Chrome and navigate to `chrome://extensions`
+2. Toggle **Developer mode** on (top-right corner of that page)
+3. Click **Load unpacked** (top-left)
+4. In the file picker, select the `extension/dist` folder (not `extension/` — it must be `dist`)
+5. The extension card for **KnowMe** now appears. Note its extension ID (not required, just useful for debugging).
+6. Click the puzzle-piece icon in the Chrome toolbar → click the pin icon next to **KnowMe** so it's always visible.
+7. Click the pinned KnowMe icon — the side panel opens on the right. The status badge at the top will say **Disconnected** until Part 4 is done. This is expected.
 
-TRIBE v2's text extractor uses Meta's Llama-3.2-3B, which is a gated model. You need to:
+### Part 3 — Start a backend (pick ONE of A / B / C)
 
-1. Create a [HuggingFace account](https://huggingface.co/join) if you don't have one
-2. Go to [meta-llama/Llama-3.2-3B](https://huggingface.co/meta-llama/Llama-3.2-3B) and accept the license agreement
-3. Generate an access token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-4. Set it as an environment variable:
+#### Option A — Local GPU server (requires NVIDIA GPU, ~15 GB disk)
 
-```bash
-export HF_TOKEN=hf_your_token_here      # Linux/macOS
-set HF_TOKEN=hf_your_token_here         # Windows CMD
-$env:HF_TOKEN = "hf_your_token_here"    # Windows PowerShell
-```
+A1. Get HuggingFace access to Meta Llama-3.2-3B:
+   1. Sign up at [huggingface.co/join](https://huggingface.co/join) if you don't have an account.
+   2. Visit [meta-llama/Llama-3.2-3B](https://huggingface.co/meta-llama/Llama-3.2-3B) and click **Agree and access repository** (free, instant).
+   3. Create a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) with **Read** permission. Copy it (starts with `hf_`).
 
-#### 4. Install server dependencies
+A2. Export the token in the terminal you'll run the server from:
+   ```bash
+   export HF_TOKEN=hf_your_token_here      # Linux/macOS
+   set HF_TOKEN=hf_your_token_here         # Windows CMD
+   $env:HF_TOKEN = "hf_your_token_here"    # Windows PowerShell
+   ```
 
-```bash
-cd server
-python -m venv .venv
-# Activate:
-source .venv/bin/activate        # Linux/macOS
-.venv\Scripts\activate           # Windows
+A3. Create and activate a Python venv, then install deps:
+   ```bash
+   cd server
+   python -m venv .venv
+   source .venv/bin/activate        # Linux/macOS
+   .venv\Scripts\activate           # Windows
 
-pip install -r requirements.txt
-```
+   pip install -r requirements.txt
+   ```
+   If pip errors on `torch`, install a CUDA build first from [pytorch.org](https://pytorch.org/get-started/locally/) and re-run the command above.
 
-> **Note:** `tribev2` is installed from GitHub. If pip fails on torch, install PyTorch with CUDA first from [pytorch.org](https://pytorch.org/get-started/locally/).
+A4. Make sure `ffmpeg` is on PATH (`ffmpeg -version` should print a version).
 
-#### 5. Start the server
+A5. Start the server:
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8000
+   ```
+   First run downloads ~15 GB of weights + atlas data; leave it running until you see `Uvicorn running on http://0.0.0.0:8000`.
 
-```bash
-cd server
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+→ Your server URL for Part 4 is **`http://localhost:8000`**.
 
-The first run downloads TRIBE v2 model weights (~15 GB), the Glasser atlas, and fsaverage5 mesh data. Subsequent starts are faster.
+#### Option B — Modal cloud (no local GPU)
 
-#### 6. Connect the extension
+B1. Complete step A1 above to get an HF token (required; TRIBE v2 pulls Llama-3.2-3B on Modal too).
 
-1. Open the KnowMe side panel by clicking the extension icon
-2. The extension connects to `http://localhost:8000` by default
-3. The status badge should show **Connected**
+B2. Install Modal and authenticate:
+   ```bash
+   pip install modal
+   modal setup
+   ```
+   `modal setup` opens a browser for login — finish it.
 
-### Option B: Modal Cloud Deployment (no local GPU needed)
+B3. Store the HF token as a Modal secret (name must be exactly `huggingface`):
+   ```bash
+   modal secret create huggingface HF_TOKEN=hf_your_token_here
+   ```
 
-[Modal](https://modal.com/) provides serverless GPU containers. This is useful if you don't have a local NVIDIA GPU.
+B4. Deploy (run from the repo root):
+   ```bash
+   modal deploy modal/deploy.py
+   ```
+   Modal prints a URL like `https://<your-username>--knowme-serve.modal.run`. Copy it — this is your server URL.
 
-#### 1. Install Modal
+→ Your server URL for Part 4 is the **Modal URL** you just copied.
 
-```bash
-pip install modal
-modal setup      # authenticate with your Modal account
-```
+> **Cost:** A100 billed per second, 5-minute keepalive (`scaledown_window=300`), scales to $0 when idle. Expect ~$0.03–0.05 per cold-start request, less when warm.
 
-#### 2. Create the HuggingFace secret
+#### Option C — Mock server (no GPU, random data, for UI work only)
 
-```bash
-modal secret create huggingface HF_TOKEN=hf_your_token_here
-```
+C1. From the repo root:
+   ```bash
+   cd server
+   pip install fastapi uvicorn pydantic
+   python mock_server.py
+   ```
 
-#### 3. Deploy
+Brain activations are random — do not draw conclusions from them. Only useful for working on the extension UI.
 
-```bash
-modal deploy modal/deploy.py
-```
+→ Your server URL for Part 4 is **`http://localhost:8000`**.
 
-Modal will print a URL like `https://your-username--knowme-serve.modal.run`. Copy this URL.
+### Part 4 — Point the extension at your server (always required)
 
-#### 4. Configure the extension
+1. Click the pinned KnowMe icon to open the side panel.
+2. At the top of the panel there is a connection-status pill (says **Disconnected** right now). **Click it** — a Server Settings overlay slides in.
+3. In the **Server URL** field, paste the URL from Part 3:
+   - Option A or C: `http://localhost:8000`
+   - Option B: the `https://…modal.run` URL
+4. Click **Save**. The overlay closes.
+5. Within a few seconds the status pill flips to **Connected**. If it doesn't, open DevTools on the side panel (right-click → Inspect) and check the console — most commonly the server isn't running yet, or (Option A) the port is firewalled.
 
-1. Open the KnowMe side panel
-2. Click the settings gear icon
-3. Paste the Modal URL as the server URL
-4. The extension will connect to your cloud GPU
-
-> **Cost note:** Modal bills per second of GPU time. The deployment uses an A100 GPU with a 5-minute keepalive window (`scaledown_window=300`). When idle, the container scales to zero and costs nothing. Expect ~$0.03-0.05 per analysis request at cold start, less when warm.
-
-### Option C: Mock Server (no GPU, for UI development)
-
-For testing the extension UI without a GPU or model:
-
-```bash
-cd server
-pip install fastapi uvicorn pydantic
-python mock_server.py
-```
-
-This starts a server on `http://localhost:8000` that returns random brain activations. Useful for frontend development and testing the visualization.
+You're done — go to [Usage](#usage).
 
 ## Usage
 
